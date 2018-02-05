@@ -167,8 +167,11 @@ Data_Table(data, "hbcu")
 var_expend <- c(
          "instruction01",
          "instruction02",
+         "studserv01",
          "tot_rev_w_auxother_sum",
          "grant01",
+         "any_aid_pct",
+         "total01",
          "instruction_share",
          "education_share",
          "noneducation_share",
@@ -212,6 +215,26 @@ apply(data[var_revenue],MARGIN =2,FUN = summary)
 apply(data[var_outcome],MARGIN =2,FUN = summary)
 apply(data[var_misc],MARGIN =2,FUN = summary)
 
+# Test to see if fte_count and fte12mn are different 
+summary(data$fte_count)
+Yearly_Missingness(data, "fte_count")
+
+summary(data$fte12mn)
+Yearly_Missingness(data, "fte12mn") # not available before 2004
+
+test <- abs((data$fte_count - data$fte12mn) / data$fte_count)
+test <- sort(test)
+summary(test) # generally not that off, just use fte_count
+tail(test, 100) # some weird numbers here
+rm(test)
+
+# Test student service expenditures
+pct_education_rev <- (data$instruction01 + data$studserv01)/data$tot_rev_w_auxother_sum
+pct_education_rev <- sort(pct_education_rev)
+summary(pct_education_rev)
+tail(pct_education_rev, 100)
+
+rm(pct_education_rev)
 
 # Total enrollment
 summary(data$total_enrollment)
@@ -224,6 +247,12 @@ summary(data$total_enrollment_multi_tot) # A ton of missing
 summary(data$total_enrollment_unkn_tot)
 summary(data$total_enrollment_nonres_tot)
 
+# Test total expenditures
+pct_education_exp <- (data$instruction01 + data$studserv01)/data$total01
+summary(pct_education_exp)
+pct_education_exp <- sort(pct_education_exp)
+tail(pct_education_exp) # a few very high numbers, but looks good otherwise
+rm(pct_education_exp)
 
 # ACT and SAT scores
 names(data)
@@ -238,3 +267,209 @@ for(var in to_check){
   print("")
   rm(var)
 } # high missing rate, and completely missing until 2002
+
+### Transform variables
+# Make a new sample dataset to alter
+sample <- data
+
+# Transform all money variables using the cpi_scalar
+sample$revenue_cpi <- sample$tot_rev_w_auxother_sum/sample$cpi_scalar_2015
+sample$pell_cpi <- sample$grant01/sample$cpi_scalar_2015
+sample$education_cpi <- (sample$instruction01 + sample$studserv01)/sample$cpi_scalar_2015
+sample$expenditures_cpi <- sample$total01/sample$cpi_scalar_2015
+
+# Generate race % variables
+sample$pct_black <- 100*sample$total_enrollment_black_tot / sample$total_enrollment
+sample$pct_hisp <- 100*sample$total_enrollment_hisp_tot / sample$total_enrollment
+sample$pct_white <- 100*sample$total_enrollment_white_tot / sample$total_enrollment
+sample$pct_asian <- 100*sample$total_enrollment_asian_tot / sample$total_enrollment
+sample$pct_other <- 100 -(sample$pct_black + sample$pct_hisp + sample$pct_white + sample$pct_asian)
+
+sample$pct_urm <- sample$pct_black + sample$pct_hisp
+sample$pct_nonurm <- sample$pct_white + sample$pct_asian
+
+# Turn all necessary variables into per 100 FTE
+sample$revenue_cpi_100fte <- (100*sample$revenue_cpi)/sample$fte_count
+sample$pell_cpi_100fte <- (100*sample$pell_cpi)/sample$fte_count
+sample$education_cpi_100fte <- (100*sample$education_cpi)/sample$fte_count
+sample$expenditures_cpi_100fte <- (100*sample$expenditures_cpi)/sample$fte_count
+
+### Keep only variables we need for analysis
+keep <- c(
+  "groupid", 
+  "unitid", 
+  "instname", 
+  "academicyear", 
+  "state",
+  "cpi_index", 
+  "cpi_scalar_2015", 
+  "fte_count",
+  names(sample)[grep("degrees", names(data))],
+  "grad_rate_150_n4yr",
+  "grad_rate_150_p4yr",
+  "grad_rate_adj_cohort_n4yr",
+  "revenue_cpi",
+  "pell_cpi",
+  "education_cpi",
+  "expenditures_cpi",
+  "revenue_cpi_100fte",
+  "pell_cpi_100fte",
+  "education_cpi_100fte",
+  "expenditures_cpi_100fte",
+  "pct_black",
+  "pct_hisp",
+  "pct_white",
+  "pct_asian",
+  "pct_other",
+  "pct_urm",
+  "pct_nonurm",
+  "total_undergraduates"
+)
+
+keep
+keep <- keep[-match("totaldegrees_100fte", keep)]
+keep
+
+sample <- sample[, keep]
+
+rm(keep)
+
+### Sort
+sample <- sample[order(sample$groupid, sample$academicyear), ]
+
+### Get rid of universities that aren't primarily bachelor's giving institutions
+# Tag universities with issues
+sample$temp <- 0
+sample$temp[sample$bachelordegrees==0 | is.na(sample$bachelordegrees)] <- 1
+sample$temp[sample$bachelordegrees<sample$masterdegrees] <- 1
+sample$temp[sample$bachelordegrees<sample$associatedegrees] <- 1
+sample$temp[sample$bachelordegrees<sample$doctordegrees] <- 1
+sample$temp[sample$bachelordegrees<sample$firstprofdegrees] <- 1
+
+tag <- data.frame(tapply(sample$temp, sample$groupid, function(x) {max(x)}))
+tag$groupid <- as.numeric(rownames(tag))
+names(tag)[1] <- "tag"
+sample <- merge(sample, tag, all=T)
+sample <- sample[, c("tag", names(sample)[-length(names(sample))])]
+View(sample[sample$tag==1, ])
+# Seems like some schools start out giving no bachelor's degrees (or have missing) and then start. For each school
+# take the years including and after they grant 10 or more bachelor degrees
+
+sample <- sample[, -match("temp", names(sample))]
+sample$temp <- sample$academicyear
+sample$temp[sample$bachelordegrees<10 | is.na(sample$bachelordegrees)] <- NA
+View(sample[sample$tag==1, ])
+first_year <- tapply(sample$temp, sample$groupid, function(x){min(x)})
+sample <- sample[, -match("temp", names(sample))]
+first_year <- data.frame(first_year)
+first_year$groupid <- as.numeric(rownames(first_year))
+names(first_year)[1] <- "first_year"
+sample <- merge(sample, first_year, all=T)
+sample <- sample[sample$academicyear >= sample$first_year & !is.na(sample$first_year), ]
+View(sample[sample$tag==1, ])
+sample <- sample[, -match("tag", names(sample))]
+sample <- sample[, -match("first_year", names(sample))]
+
+rm(first_year)
+
+# re-do the tag
+sample$temp <- 0
+sample$temp[sample$bachelordegrees==0 | is.na(sample$bachelordegrees)] <- 1
+sample$temp[sample$bachelordegrees<sample$masterdegrees] <- 1
+sample$temp[sample$bachelordegrees<sample$associatedegrees] <- 1
+sample$temp[sample$bachelordegrees<sample$doctordegrees] <- 1
+sample$temp[sample$bachelordegrees<sample$firstprofdegrees] <- 1
+
+tag <- data.frame(tapply(sample$temp, sample$groupid, function(x) {max(x)}))
+tag$groupid <- as.numeric(rownames(tag))
+names(tag)[1] <- "tag"
+sample <- merge(sample, tag, all=T)
+sample <- sample[, c("tag", names(sample)[-length(names(sample))])]
+View(sample[sample$tag==1, ]) # These look alright on the whole
+sample <- sample[, -match("tag", names(sample))]
+sample <- sample[, -match("temp", names(sample))]
+
+### Check missing rates again
+Yearly_Missingness(sample, names(sample))
+
+### Check institutions missing graduation rate
+sample$temp <- 0
+sample$temp[is.na(sample$grad_rate_150_n4yr) & sample$academicyear>=2002] <- 1
+Data_Table(sample, "temp")
+
+tag <- data.frame(tapply(sample$temp, sample$groupid, function(x) {max(x)}))
+tag$groupid <- as.numeric(rownames(tag))
+names(tag)[1] <- "tag"
+sample <- merge(sample, tag, all=T)
+sample <- sample[, c("tag", "temp", names(sample)[-match(c("tag","temp"), names(sample))])]
+View(sample[sample$tag==1, ]) # in interest of keeping sample the same, drop these universities
+
+Data_Table(sample, "tag")
+sample <- sample[sample$tag!=1, ]
+Data_Table(sample, "tag")
+
+sample <- sample[, -match("tag", names(sample))]
+sample <- sample[, -match("temp", names(sample))]
+
+rm(tag)
+
+### Create bachelor's per 100 FTE
+sample$bachelor_100fte <- 100*sample$bachelordegrees / sample$fte_count
+
+### Make new dataset with just 2003 on
+sample_2003 <- sample[sample$academicyear>=2003,]
+
+
+
+##### SOME PRELIMINARY MODELS
+### Regular Regression models on bachelors per 100 FTE and grad rate
+# bachelors 100 FTE
+fit_bach100fte_ls <- glm(data = sample_2003, family="gaussian",
+                         bachelor_100fte ~ 
+                           pell_cpi_100fte + 
+                           pct_black +
+                           pct_hisp + 
+                           education_cpi_100fte*total_undergraduates +
+                           education_cpi_100fte*revenue_cpi_100fte
+)
+
+summary(fit_bach100fte_ls) 
+
+
+# Grad Rate
+fit_gradrate_ls <- glm(data = sample_2003, family="gaussian", 
+                       grad_rate_150_p4yr ~ 
+                         pell_cpi_100fte + 
+                         pct_black +
+                         pct_hisp + 
+                         education_cpi_100fte*total_undergraduates +
+                         education_cpi_100fte*revenue_cpi_100fte
+)
+
+summary(fit_gradrate_ls) 
+
+
+### Count models on bachelors and grad rate
+# Total bachelor degrees (Poisson Model)
+fit_bach_pois <- glm(data = sample_2003, family="poisson",
+                     bachelor_100fte ~ 
+                       pell_cpi_100fte + 
+                       pct_black +
+                       pct_hisp + 
+                       education_cpi_100fte*total_undergraduates +
+                       education_cpi_100fte*revenue_cpi_100fte
+)
+
+summary(fit_bach_pois) 
+
+# Graduation Rate (binomial model)
+fit_gradrate_bin <- glm(data = sample_2003, family="binomial",
+                        grad_rate_150_p4yr ~ 
+                          pell_cpi_100fte + 
+                          pct_black +
+                          pct_hisp + 
+                          education_cpi_100fte*total_undergraduates +
+                          education_cpi_100fte*revenue_cpi_100fte
+)
+
+summary(fit_gradrate_bin)
