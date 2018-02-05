@@ -452,7 +452,7 @@ summary(fit_gradrate_ls)
 ### Count models on bachelors and grad rate
 # Total bachelor degrees (Poisson Model)
 fit_bach_pois <- glm(data = sample_2003, family="poisson",
-                     bachelor_100fte ~ 
+                     bachelordegrees ~ 
                        pell_cpi_100fte + 
                        pct_black +
                        pct_hisp + 
