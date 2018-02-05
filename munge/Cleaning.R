@@ -1,13 +1,9 @@
-##### SET UP
-### Libraries
-library(readstata13)
 
 ### Clear Directory
 rm(list=ls())
 
 ### Set Directory
-getwd()
-setwd("/Users/leonardwainstein/Desktop/UCLA/Work/Coursework/2017 B (Winter)/Stats 201B/Final Project/Data")
+setwd("data")
 
 ### Create a function that will table or summarize all variables in a dataset
 Data_Table <- function(data, varlist=names(data)) {
@@ -31,8 +27,8 @@ Data_Table <- function(data, varlist=names(data)) {
 
 ##### CLEANING
 ### Read in data
-data1 <- read.dta13("Raw Data/delta_public_release_87_99.dta")
-data2 <- read.dta13("Raw Data/delta_public_release_00_15.dta")
+data1 <- read.dta13("delta_public_release_87_99.dta")
+data2 <- read.dta13("delta_public_release_00_15.dta")
 
 ### Check if columns match up
 sum(1-(names(data1)==names(data2))) # 0
@@ -131,97 +127,91 @@ rm(to_tab)
 # Create a function for examining missingness by year
 Yearly_Missingness <- function(data, var){
   temp <- data
-  temp$tag = 1*is.na(temp[, var])
-  table <- tapply(temp$tag, temp$academicyear, function(x){100*mean(x)})
-  table <- data.frame(t(t(table)))
-  names(table) <- c("Percentage")
-  print(table, quote=FALSE)
-  
-  rm(temp)
+  output <- data.frame(sort(unique(temp$academicyear)))
+  for(i in 1:length(var)){
+    temp$tag = 1*is.na(temp[, var[i]])
+    table <- tapply(temp$tag, temp$academicyear, function(x){100*mean(x)})
+    table <- data.frame(t(t(table)))[,1]
+    output <- cbind(output,table)
+  }
+  rm(temp) 
   rm(table)
+  names(output) <- c("academicyear",var)
+  return(output)
 }
+
+#Test that scalar indices are correct for 2015.
+test_index <- function(data,index,scalar,year){
+  
+test <- unique(data[, c("academicyear", index, scalar)])
+test <- test[order(test$academicyear),]
+test$my_scalar <- test[,index]/(test[,index][(test$academicyear == year)])
+test$diff <- test[,scalar] - test$my_scalar
+summary(test$diff)
+}
+
+#CPI
+test_index(data,"cpi_index","cpi_scalar_2015",2015)
+
+#Hepi
+test_index(data,"hepi_index","hepi_scalar_2015",2015)
+
+#Heca
+test_index(data,"heca_index","heca_scalar_2015",2015)
+
 
 # HBCU
 Data_Table(data, "hbcu")
 
-# CPIs
-summary(data$cpi_index)
-summary(data$cpi_scalar_2015)
+#Aggregate data missingness test for vector of variables of interest:
+var_expend <- c(
+         "instruction01",
+         "instruction02",
+         "tot_rev_w_auxother_sum",
+         "grant01",
+         "instruction_share",
+         "education_share",
+         "noneducation_share",
+         "studserv_share",
+         "admin_share",
+         "research_share",
+         "pubserv_share",
+         "depreciation01")
+         
+var_revenue <-c("tuition03",
+                "tuition_reliance_a1",
+                "govt_reliance_a",
+                "nettuition_share")
 
-test <- unique(data[, c("academicyear", "cpi_index", "cpi_scalar_2015")])
-test <- test[order(test$academicyear), ]
-View(test)
+var_outcome <- c("fte_count",
+                 "fte12mn",
+                 "grad_rate_150_n",
+                 "grad_rate_150_p",
+                 "grad_rate_150_n4yr",
+                 "grad_rate_150_p4yr",
+                 "ftretention_rate",
+                 "ptretention_rate",
+                 "grad_rate_adj_cohort_n",
+                 "grad_rate_adj_cohort_n4yr",
+                 "bachelordegrees",
+                 "masterdegrees",
+                 "doctordegrees",
+                 "firstprofdegrees")
 
-test$my_cpi <- test$cpi_index/236.800 
-test$diff <- test$cpi_scalar_2015 - test$my_cpi
-summary(test$diff)
+var_misc <- c("year_total_undergrad",
+              "total_undergraduates",
+              "total_enrollment_multi_tot")
 
-rm(test)
+Yearly_Missingness(data, var_expend)
+Yearly_Missingness(data, var_revenue)
+Yearly_Missingness(data,var_outcome)
+Yearly_Missingness(data,var_misc)
 
-# FTE 
-summary(data$fte_count)
-Yearly_Missingness(data, "fte_count")
+apply(data[var_expend],MARGIN =2,FUN = summary)
+apply(data[var_revenue],MARGIN =2,FUN = summary)
+apply(data[var_outcome],MARGIN =2,FUN = summary)
+apply(data[var_misc],MARGIN =2,FUN = summary)
 
-summary(data$fte12mn)
-Yearly_Missingness(data, "fte12mn") # not available before 2004
-
-# Total revenue
-summary(data$tot_rev_w_auxother_sum)
-Yearly_Missingness(data, "tot_rev_w_auxother_sum")
-
-# Pell grants
-summary(data$grant01)
-Yearly_Missingness(data, "grant01")
-
-# Instruction expenditures
-summary(data$instruction01)
-Yearly_Missingness(data, "instruction01")
-
-summary(data$instruction02)
-Yearly_Missingness(data, "instruction02") # pretty much all missing in 2000 and 2001
-
-# Total expenditures
-summary(data$total01)
-Yearly_Missingness(data, "total01") # pretty much all missing until 2002
-
-# shares of expenses
-summary(data$education_share)
-Yearly_Missingness(data, "education_share") # looks good
-
-summary(data$noneducation_share)
-Yearly_Missingness(data, "noneducation_share") # looks good
-
-# Bachelor's degrees
-summary(data$bachelordegrees) # Some very low numbers
-Yearly_Missingness(data, "bachelordegrees") # looks good
-Data_Table(data, "bachelordegrees")
-hist(data$bachelordegrees, breaks=1000)
-
-# Grad rates
-summary(data$grad_rate_150_n4yr)
-Yearly_Missingness(data, "grad_rate_150_n4yr")
-
-summary(data$grad_rate_150_p4yr)
-Yearly_Missingness(data, "grad_rate_150_p4yr")
-
-summary(data$grad_rate_adj_cohort_n4yr)
-Yearly_Missingness(data, "grad_rate_adj_cohort_n4yr")
-  # All missing before 2002 for these 
-
-# Retention rates
-summary(data$ftretention_rate)
-Yearly_Missingness(data, "ftretention_rate")
-
-summary(data$ptretention_rate)
-Yearly_Missingness(data, "ptretention_rate")
-  # Would need to start at 2005 for these
-
-# Total undergrads
-summary(data$year_total_undergrad)
-Yearly_Missingness(data, "year_total_undergrad") # not going to be able to use this one
-
-summary(data$total_undergraduates)
-Yearly_Missingness(data, "total_undergraduates")
 
 # Total enrollment
 summary(data$total_enrollment)
@@ -234,7 +224,6 @@ summary(data$total_enrollment_multi_tot) # A ton of missing
 summary(data$total_enrollment_unkn_tot)
 summary(data$total_enrollment_nonres_tot)
 
-Yearly_Missingness(data, "total_enrollment_multi_tot") # unusable
 
 # ACT and SAT scores
 names(data)
