@@ -1,0 +1,23 @@
+Notes on Literature:
+
+#########Tandberg & Hillman:############
+
+As stated does not account for different levels of PBF.
+Includes PBF and OBF as the same treatment.
+
+Not sure whyu it says treatment effect in table 3 is "small  and significant" the treatment effect
+parameter does not seem to be significant in any of the models.
+
+Table 4 not sure why certain years are significant accross the board but others are not.
+
+Not sure this is quantitive evidence that longer durations have effects - consider bernoulli 
+selecting which out of the 11 durations were significant - does not seem unreasonable to have
+drawn years 6,8,11 as significant, if all years are equally likely to be significant.
+
+
+
+
+########Slaughter et. al :#############
+
+Only considers OBF - does not consider states history of PBF
+

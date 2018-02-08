@@ -1,0 +1,21 @@
+Poisson Count model for number of bachelor degrees awarded.
+
+Fit our poisson GLM.
+Do we need negative binomial since can't graduate more people than enrolled, likely not more than
+enrollment/4. Should check this for robustness.
+
+Need to use log link function?
+
+Look at distributions of first differences on:
+1) Proportion of spending on instruction
+2) Proportion of spending on student services
+3) Proportion of spending on administration
+
+Cluster standard errors on institutions, include effects for time. Talk about if we can do this
+clusterisation simulataneously - mentioned before.
+
+
+Throw some regularised learning algorithms at the un-restricted data set and see if we come
+up with anything that is interpretable - removes the element of selecting which variables to
+include. Train on 4 year universities, then use this to test on some other set e.g. 2 year
+universities.
