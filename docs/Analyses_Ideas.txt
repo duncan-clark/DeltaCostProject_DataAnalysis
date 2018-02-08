@@ -10,6 +10,7 @@ Look at distributions of first differences on:
 1) Proportion of spending on instruction
 2) Proportion of spending on student services
 3) Proportion of spending on administration
+4) 
 
 Cluster standard errors on institutions, include effects for time. Talk about if we can do this
 clusterisation simulataneously - mentioned before.

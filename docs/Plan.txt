@@ -1,0 +1,9 @@
+Action Plan 02/08/2018
+
+DC - Finalise sample
+   - First Differences
+
+LW - Get GDP, unemployment rates, others
+   - Cluster standard errors for models/ multiway clusters.
+
+ 
