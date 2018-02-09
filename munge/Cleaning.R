@@ -434,6 +434,7 @@ names(tag)[1] <- "tag"
 sample <- merge(sample, tag, all=T)
 sample <- sample[, c("tag", "temp", names(sample)[-match(c("tag","temp"), names(sample))])]
 #View(sample[sample$tag==1, ]) # in interest of keeping sample the same, drop these universities
+#length(unique(sample[(sample$tag==1),]$groupid)) - removes 30 institutions
 
 Data_Table(sample, "tag")
 sample <- sample[sample$tag!=1, ]
