@@ -345,7 +345,7 @@ for(i in 1:length(sample_dollar_variables)){
 
 ### function to turn dollar values into percent of FTE
 fte_transform <- function(data,variable){
-  data[,paste(variable,"_100fte")] <- 100*(data[,variable]/data$fte_count)
+  data[,paste(variable,"_100fte",sep ="")] <- 100*(data[,variable]/data$fte_count)
   return(data)
 }
 
