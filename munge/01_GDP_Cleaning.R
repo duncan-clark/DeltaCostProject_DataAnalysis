@@ -39,8 +39,8 @@ states <- c( "AK", "AL", "AR", "AZ", "CA",
 
 for(s in states){
   # Assign file name
-  gdp_file <- paste("data/Raw Data/GDP/", s, "NGSP.csv", sep="")
-  pop_file <- paste("data/Raw Data/GDP/", s, "POP.csv", sep="")
+  gdp_file <- paste("data/Raw_Data/GDP/", s, "NGSP.csv", sep="")
+  pop_file <- paste("data/Raw_Data/GDP/", s, "POP.csv", sep="")
 
   # Read in data
   gdp_temp <- read.csv(gdp_file, header=T)
@@ -121,4 +121,4 @@ rm(states)
 rm(Data_Table)
 
 ### Save file
-save(gdp_data, file="data/Working Data/GDP Per Capita 2003-2015.Rda")
+save(gdp_data, file="data/Working_Data/GDP Per Capita 2003-2015.Rda")

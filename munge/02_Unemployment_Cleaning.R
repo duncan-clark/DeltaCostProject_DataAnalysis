@@ -28,7 +28,7 @@ data <- NULL # empty dataset to rbind each year onto
 
 for(yr in 2003:2015){
   # Assign file name
-  file <- paste("data/Raw Data/Unemployment/", yr, ".csv", sep="")
+  file <- paste("data/Raw_Data/Unemployment/", yr, ".csv", sep="")
   
   # Read in data
   temp <- read.csv(file, header=F)
@@ -132,4 +132,4 @@ Data_Table(data, c("state", "academicyear")) # All states in data for all years
 unemployment_data <- data
 
 ### Save file
-save(unemployment_data, file="data/Working Data/Unemployment 2003-2015.Rda")
+save(unemployment_data, file="data/Working_Data/Unemployment 2003-2015.Rda")

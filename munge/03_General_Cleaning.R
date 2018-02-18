@@ -57,8 +57,8 @@ Drop_Var <- function(data, varlist){
 
 ##### INVESTIGATE VARIABLES WE'RE INTERESTED IN
 ### Read in data
-data1 <- read.dta13("data/Raw Data/Delta Cost/delta_public_release_87_99.dta")
-data2 <- read.dta13("data/Raw Data/Delta Cost/delta_public_release_00_15.dta")
+data1 <- read.dta13("data/Raw_Data/Delta Cost/delta_public_release_87_99.dta")
+data2 <- read.dta13("data/Raw_Data/Delta Cost/delta_public_release_00_15.dta")
 
 ### Check if columns match up in both datasets
 sum(1-(names(data1)==names(data2))) # 0
@@ -569,8 +569,8 @@ num_schools # 441
 ##### MAKE/GET VARIABLES WE NEED FOR ANALYSIS
 ### Merge with unemployment and GDP
 # Load gdp and unemployment datasets
-load("data/Working Data/GDP Per Capita 2003-2015.Rda")
-load("data/Working Data/Unemployment 2003-2015.Rda")
+load("data/Working_Data/GDP Per Capita 2003-2015.Rda")
+load("data/Working_Data/Unemployment 2003-2015.Rda")
 
 # Merge
 sample <- merge(sample, gdp_data, by = c("academicyear","state"))
@@ -652,8 +652,8 @@ sample_allvar <- merge(data,sample[,ids],by =ids)
 sample <- sample[order(sample$groupid, sample$academicyear), ]
 
 ### Save file
-save(sample, file="data/Working Data/sample.Rda")
-save(sample, file="data/Working Data/sample_allvar.Rda")
+save(sample, file="data/Working_Data/sample.Rda")
+save(sample, file="data/Working_Data/sample_allvar.Rda")
 
 cache("sample")
 cache("sample_allvar")
