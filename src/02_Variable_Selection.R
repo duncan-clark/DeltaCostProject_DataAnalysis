@@ -1,8 +1,12 @@
 ## This script perform lasso,ridge and elastic net on the training data in order to identify
-## the important variables removing our pre concieved ideas on what variables might be useful
+## the important variables without pre concieved ideas on what variables might be useful
+
+# Code split into Sections ctrl f #1) #2) etc. for each section
 
 library(ProjectTemplate)
 load.project()
+
+#1)Examine data
 
 #remove all outcome variables apart from "grad_rate_150_p4y" otherwise since these are highly
 #correlated regularisation will just throw away everything else.
@@ -62,7 +66,7 @@ sample_reg_train2 <- apply(sample_reg_train2, MARGIN =2, function(x){
                                                          else {
                                                          (x - mean(x))/(sd(x))} })
 
-### Ridge ###
+#2)## Ridge ###
 lambdas <- 10^seq(3,-2,-0.01)
 
 fit_ridge <- glmnet(x = sample_reg_train1[,-match("grad_rate_150_p4yr",colnames(sample_reg_train1))],
@@ -101,7 +105,7 @@ beta_ridge_smallest_names <- rownames(beta_ridge)[match(beta_ridge_smallest,beta
 #also picks ups part timers: ptug_share_of_total_pt_enrl is percentage of undergrads that are part time
 #may also pick up negative effect of grad, assoc and prof degrees.
 
-### LASSO ###
+#3)## LASSO ###
 #Try the same thing as for ridge but with LASSO
 
 lambdas <- 10^seq(3,-2,-0.01)
@@ -138,7 +142,7 @@ beta_lasso_smallest_names <- rownames(beta_lasso)[match(beta_lasso_smallest,beta
 ###Looking at variables with smallest coefficients comments:
 
 
-### Elastic Net ###
+#4)## Elastic Net ###
 
 lambdas <- 10^seq(3,-2,-0.01)
 
@@ -174,15 +178,162 @@ beta_elasticnet_smallest_names <- rownames(beta_elasticnet)[match(beta_elasticne
 
 ###Looking at variables with smallest coefficients comments:
 
-comparison <- data.frame(ridge_biggest = beta_ridge_biggest_names,
-                         lasso_biggest = beta_lasso_biggest_names,
-                         elasticnet_biggest = beta_elasticnet_biggest_names,
-                         ridge_smallest =beta_ridge_smallest_names,
-                         lasso_smallest = beta_lasso_smallest_names,
-                         elasticnet_smallest = beta_elasticnet_smallest_names)
+
 
 ## Comparison gives broadly similar results over ridge,lasso and elastic net, with elastic net looking
 # more similar to Lasso - suggest this is as both throw away the multicolinear terms?
+
+
+#5)## Check for Lasso Robustness ###
+
+lambdas <- 10^seq(3,-2,-0.01)
+
+fit_lasso2 <- glmnet(x = sample_reg_train2[,-match("grad_rate_150_p4yr",colnames(sample_reg_train2))],
+                    y = sample_reg_train2[,match("grad_rate_150_p4yr",colnames(sample_reg_train2))],
+                    family = "gaussian",alpha = 1,
+                    lambda = lambdas)
+cv_fit_lasso2 <- cv.glmnet(x = sample_reg_train2[,-match("grad_rate_150_p4yr",colnames(sample_reg_train2))],
+                          y = sample_reg_train2[,match("grad_rate_150_p4yr",colnames(sample_reg_train2))],
+                          family = "gaussian",alpha = 1,
+                          lambda = lambdas)
+## Uses default 10 folds.
+plot(cv_fit_lasso)
+
+opt_lambda <- cv_fit_lasso2$lambda.min
+beta_lasso2 <- as.matrix(fit_lasso2$beta[,match(opt_lambda,lambdas)])
+
+# First look at the size of the coefficients:
+
+summary(beta_lasso2)
+
+#10 biggest
+beta_lasso2_biggest <- sort(beta_lasso2,decreasing = TRUE)[1:30]
+beta_lasso2_biggest_names <- rownames(beta_lasso2)[match(beta_lasso2_biggest,beta_lasso2)]
+
+####Looking at variables with largest coefficients comments:
+
+
+#10 smallest (i.e. largest negtive values)
+beta_lasso2_smallest <- sort(beta_lasso2,decreasing = FALSE)[1:30]
+beta_lasso2_smallest_names <- rownames(beta_lasso2)[match(beta_lasso2_smallest,beta_lasso)]
+
+###Looking at variables with smallest coefficients comments:
+
+
+#Comparison 
+
+comparison <- data.frame(ridge_biggest = beta_ridge_biggest_names,
+                         lasso_biggest = beta_lasso_biggest_names,
+                         elasticnet_biggest = beta_elasticnet_biggest_names,
+                         lasso2_biggest = beta_lasso2_biggest_names,
+                         ridge_smallest =beta_ridge_smallest_names,
+                         lasso_smallest = beta_lasso_smallest_names,
+                         elasticnet_smallest = beta_elasticnet_smallest_names,
+                         lasso2_smallest = beta_lasso2_smallest_names)
+
+# Method 2 basically gives us completely different variables :(
+
+#Look if any of the top5 for each method were excluded from method 2
+
+exclusions2 <- colnames(sample_reg_train)[as.logical(1-no_na)]
+
+num_exclusions_top10 <- apply(comparison[1:10,1:3],MARGIN =2, function(x){sum(x %in% exclusions2)})
+num_exclusions_top5 <- apply(comparison[1:5,1:3],MARGIN =2, function(x){sum(x %in% exclusions2)})
+
+# This is worrying, check to see if any of the top 5 in method 1 have high levels of missingness,
+# and therefore can't be used.
+
+
+cbind(as.character(comparison[1:10,1]),sapply(comparison[1:10,1],
+                       function(x){sum(is.na(sample_reg_train[,match(x,colnames(sample_reg_train))]))}))
+
+cbind(as.character(comparison[1:10,2]),sapply(comparison[1:10,2],
+                                             function(x){sum(is.na(sample_reg_train[,match(x,colnames(sample_reg_train))]))}))
+
+cbind(as.character(comparison[1:10,3]),sapply(comparison[1:10,3],
+                                             function(x){sum(is.na(sample_reg_train[,match(x,colnames(sample_reg_train))]))}))
+##Conclusions from this:
+##fterententionrate almost best predictor - doesn't really tell us much about graduation rate. - but
+# probably shouldn't use this anyhow due to missingness
+## missingness not really a problem for other variables barring sat scores.
+
+###Approach 3 
+#remove variables that are obviously multicolinear, based on intuition and the above regularised regressions
+#take hybrid between approaches 1 and 2, allow variables with missingness if it is less than say arbitrarily 200 observations out of 4000 = approx. 5%
+
+sample_reg_train3 <- sample_reg_train
+
+###simply based on inspection from previous lasso model
+covariates_drop <-  c("ftretention_rate", "grscohortpct","totaldegrees_100fte" )
+sample_reg_train3 <- sample_reg_train[,-match(covariates_drop,colnames(sample_reg_train))]
+
+#remove variables with more than 200 nas
+
+numbers_nas <- apply(sample_reg_train3, MARGIN =2,
+                     function(x){sum(is.na(x))})
+sample_reg_train3 <- sample_reg_train3[,as.logical((1-(numbers_nas >=200)))]
+
+# replace Nas with column means
+col_means <- apply(as.matrix(sample_reg_train3), MARGIN =2, function(x){mean(x, na.rm = TRUE)})
+
+for(i in 1:length(sample_reg_train3[1,])){
+  sample_reg_train3[is.na(sample_reg_train3[,i]),i] <- col_means[i]
+}
+
+numbers_nas <- apply(sample_reg_train3, MARGIN =2, function(x){sum(is.na(x))})
+summary(numbers_nas)
+
+# standardise
+
+sample_reg_train3 <- apply(sample_reg_train3, MARGIN =2, function(x){
+  if(sd(x) == 0){x}
+  else {
+    (x - mean(x))/(sd(x))} })
+
+###Lassso###
+
+lambdas <- 10^seq(3,-2,-0.01)
+
+fit_lasso3 <- glmnet(x = sample_reg_train3[,-match("grad_rate_150_p4yr",colnames(sample_reg_train3))],
+                    y = sample_reg_train3[,match("grad_rate_150_p4yr",colnames(sample_reg_train3))],
+                    family = "gaussian",alpha = 1,
+                    lambda = lambdas)
+cv_fit_lasso3 <- cv.glmnet(x = sample_reg_train3[,-match("grad_rate_150_p4yr",colnames(sample_reg_train3))],
+                          y = sample_reg_train3[,match("grad_rate_150_p4yr",colnames(sample_reg_train3))],
+                          family = "gaussian",alpha = 1,
+                          lambda = lambdas)
+## Uses default 10 folds.
+plot(cv_fit_lasso3)
+
+opt_lambda <- cv_fit_lasso3$lambda.min
+beta_lasso3 <- as.matrix(fit_lasso3$beta[,match(opt_lambda,lambdas)])
+
+# First look at the size of the coefficients:
+
+summary(beta_lasso3)
+
+#10 biggest
+beta_lasso3_biggest <- sort(beta_lasso3,decreasing = TRUE)[1:30]
+beta_lasso3_biggest_names <- rownames(beta_lasso3)[match(beta_lasso3_biggest,beta_lasso3)]
+
+####Looking at variables with largest coefficients comments:
+#Interesting that faculty salary has big prediction value
+#total completions_FTE should be removed
+#bachelor degrees as share of total degrees also makes another appearance.
+
+#10 smallest (i.e. largest negtive values)
+beta_lasso3_smallest <- sort(beta_lasso3,decreasing = FALSE)[1:30]
+beta_lasso3_smallest_names <- rownames(beta_lasso3)[match(beta_lasso3_smallest,beta_lasso3)]
+
+###Looking at variables with smallest coefficients comments
+#fed grant important,
+#part time variables important, could be removed.
+
+
+
+
+
+
 
 
 
