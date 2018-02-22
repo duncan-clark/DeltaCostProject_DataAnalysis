@@ -178,8 +178,6 @@ beta_elasticnet_smallest_names <- rownames(beta_elasticnet)[match(beta_elasticne
 
 ###Looking at variables with smallest coefficients comments:
 
-
-
 ## Comparison gives broadly similar results over ridge,lasso and elastic net, with elastic net looking
 # more similar to Lasso - suggest this is as both throw away the multicolinear terms?
 
@@ -254,17 +252,18 @@ cbind(as.character(comparison[1:10,3]),sapply(comparison[1:10,3],
                                              function(x){sum(is.na(sample_reg_train[,match(x,colnames(sample_reg_train))]))}))
 ##Conclusions from this:
 ##fterententionrate almost best predictor - doesn't really tell us much about graduation rate. - but
-# probably shouldn't use this anyhow due to missingness
+##probably shouldn't use this anyhow due to missingness
 ## missingness not really a problem for other variables barring sat scores.
 
 ###Approach 3 
-#remove variables that are obviously multicolinear, based on intuition and the above regularised regressions
-#take hybrid between approaches 1 and 2, allow variables with missingness if it is less than say arbitrarily 200 observations out of 4000 = approx. 5%
+##remove variables that are obviously multicolinear, based on intuition and the above regularised regressions
+##take hybrid between approaches 1 and 2, allow variables with missingness if it is less than say arbitrarily 200 observations out of 4000 = approx. 5%
+##need to code discrete variables as factors so we don't give continous jumps and actually include discrete effects.
 
 sample_reg_train3 <- sample_reg_train
 
 ###simply based on inspection from previous lasso model
-covariates_drop <-  c("ftretention_rate", "grscohortpct","totaldegrees_100fte" )
+covariates_drop <-  c("ftretention_rate", "grscohortpct","totaldegrees_100fte","zip")
 sample_reg_train3 <- sample_reg_train[,-match(covariates_drop,colnames(sample_reg_train))]
 
 #remove variables with more than 200 nas
@@ -282,6 +281,46 @@ for(i in 1:length(sample_reg_train3[1,])){
 
 numbers_nas <- apply(sample_reg_train3, MARGIN =2, function(x){sum(is.na(x))})
 summary(numbers_nas)
+
+#define function to look for variables that should be coded as factors:
+factor_search <- function(col){
+  tmp <- sort(col,decreasing = TRUE)
+  for(i in 1:(length(tmp)-1)){
+    tmp[i] <- tmp[i] - tmp[i+1]
+  }
+  if(length(unique(tmp)) <50){return(1)}
+  # Checks if there are few differences between the data points, 100 in the context of 4000 obsv not many
+  tmp <- col
+  if(length(unique(col)) <50){return(1)}
+  # Checks if there are few different values.
+return(0)
+  }
+
+factors <- apply(sample_reg_train3,2,factor_search)
+possible_factors <- colnames(sample_reg_train3)[as.logical(factors)]
+#captures what I think it should, though also captures percentages, index and scaling variables. 
+#remove index, scaling and percentage variables from list
+
+possible_factors <- possible_factors[-(grep("pct",possible_factors))]
+possible_factors <- possible_factors[-(grep("index",possible_factors))]
+possible_factors <- possible_factors[-(grep("scalar",possible_factors))]
+#List seems more reasonable
+#glmnet cannot handle factors so need to manually make all our factors into dummy variables
+#to do this convert our matrix back into a dataframe use model.matrix then back to matrix
+
+sample_reg_train3 <- as.data.frame(sample_reg_train3)
+
+for(i in possible_factors){
+  sample_reg_train3[,match(i,names(sample_reg_train3))] <- as.factor(sample_reg_train3[,match(i,names(sample_reg_train3))])
+}
+
+dim(sample_reg_train3)
+#213 covariate
+sample_reg_train3 <- model.matrix(data = as.matrix(sample_reg_train3), 
+                                  object = colnames(sample_reg_train3))
+
+
+
 
 # standardise
 
