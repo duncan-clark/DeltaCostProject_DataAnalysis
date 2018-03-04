@@ -10,7 +10,6 @@ rm(list=ls())
 
 ### Libraries
 library(readstata13)
-library(mice)
 
 ### Create a function that will table or summarize all variables in a dataset
 Data_Table <- function(data, varlist=names(data)) {
@@ -191,9 +190,21 @@ tail(test, 100) # some weird numbers here
 rm(test)
 
 ### Examine variables we plan of using
-# Define vectors with lists of outcomes, covariates, normalizing constants/variables, and expenditure variables
+# Define vectors with lists of independent, outcomes, covariates, and normalizing constants/variables
+var_independent <- c(
+  "instruction01", 
+  "studserv01",
+  "instruction02",
+  "total01",
+  "ftall1",
+  "ptall1",
+  "ptall2"
+)
+
 var_outcomes <- c(
   "bachelordegrees",
+  "grad_rate_150_n4yr",
+  "grad_rate_adj_cohort_n4yr",
   "grad_rate_150_p4yr"
 )
 
@@ -211,7 +222,8 @@ var_covariates <- c(
   "state03",
   "total_undergraduates",
   "nettuition01",
-  "tot_rev_w_auxother_sum"
+  "tot_rev_w_auxother_sum",
+  "depreciation01"
 )
 
 var_normalizers <- c(
@@ -222,44 +234,60 @@ var_normalizers <- c(
 )
 
 # Old variable lists
-var_expend <- c(
-  "instruction01",
-  "instruction02",
-  "research01",
-  "research02",
-  "pubserv01",
-  "pubserv02",
-  "acadsupp01",
-  "acadsupp02",
-  "studserv01",
-  "studserv02",
-  "instsupp01",
-  "instsupp02",
-  "opermain01",
-  "opermain02",
-  "depreciation01",
-  "grants01",
-  "auxiliary01",
-  "auxiliary02",
-  "hospital01",
-  "hospital02",
-  "independ01",
-  "independ02",
-  "otheroper01",
-  "otheroper02"
-)
+#var_expend <- c(
+#         "instruction01",
+#         "instruction02",
+#         "studserv01",
+#         "tot_rev_w_auxother_sum",
+#         "grant01",
+#         "any_aid_pct",
+#         "total01",
+#         "instruction_share",
+#         "education_share",
+#         "noneducation_share",
+#         "studserv_share",
+#         "admin_share",
+#         "research_share",
+#         "pubserv_share",
+#         "depreciation01")
+         
+#var_revenue <-c("tuition03",
+#                "tuition_reliance_a1",
+#                "govt_reliance_a",
+#                "nettuition_share",
+#                "tot_rev_w_auxother_sum")
+
+#var_outcome <- c("fte_count",
+#                 "fte12mn",
+#                 "grad_rate_150_n",
+#                 "grad_rate_150_p",
+#                 "grad_rate_150_n4yr",
+#                 "grad_rate_150_p4yr",
+#                 "ftretention_rate",
+#                 "ptretention_rate",
+#                 "grad_rate_adj_cohort_n",
+#                 "grad_rate_adj_cohort_n4yr",
+#                 "bachelordegrees",
+#                 "masterdegrees",
+#                 "doctordegrees",
+#                 "firstprofdegrees")
+
+#var_misc <- c("year_total_undergrad",
+#              "total_undergraduates",
+#              "total_enrollment_multi_tot")
 
 # Check missing rates
-Yearly_Missingness(data, var_outcomes)
+Yearly_Missingness(data, var_independent) # looks like number of faculty is going to be unusuable - too many missing values
+var_independent <- var_independent[-match(c("ftall1", "ptall1", "ptall2"), var_independent)]
+
+Yearly_Missingness(data, var_outcomes) # Look pretty good!
 
 Yearly_Missingness(data, var_covariates) # Look pretty good!
 
 Yearly_Missingness(data, var_normalizers) # Look pretty good!
 
-Yearly_Missingness(data, var_expend) # Some have very high missing rates - will need to drop some of these or do imputation
-
 # Check summaries
-apply(data[var_expend],MARGIN =2,FUN = summary)
+apply(data[var_independent],MARGIN =2,FUN = summary)
 
 apply(data[var_outcomes],MARGIN =2,FUN = summary) # Some very low and very high values - may want to think about dropping those schools
 
@@ -322,24 +350,31 @@ var_ids <- c(
 )
 
 ### Define other variables we may  be interested in
-#var_other <- c(
-#  "associatedegrees",
-#  "masterdegrees",
-#  "doctordegrees",
-#  "firstprofdegrees",
-#  "totaldegrees",
-#  "any_aid_pct",
-#  "instruction_share",
-#  "education_share",
-#  "noneducation_share",
-#  "studserv_share",
-#  "admin_share",
-#  "research_share",
-#  "pubserv_share"
-#)
+var_other <- c(
+  "associatedegrees",
+  "masterdegrees",
+  "doctordegrees",
+  "firstprofdegrees",
+  "totaldegrees",
+  "any_aid_pct",
+  "instruction_share",
+  "education_share",
+  "noneducation_share",
+  "studserv_share",
+  "admin_share",
+  "research_share",
+  "pubserv_share"
+)
 
 ### Create dataset with just the variables we need
-sample <- data
+sample <- data[ ,c(
+    var_ids, 
+    var_independent, 
+    var_covariates, 
+    var_normalizers, 
+    var_outcomes,
+    var_other
+)]
 
 ### Keep only observations starting in 2003
 sample <- sample[sample$academicyear>=2003, ]
@@ -483,32 +518,16 @@ sample <- Drop_Var(sample, c("temp", "to_check"))
 rm(to_check)
 
 ### Check missing rates of all the variables now
-Yearly_Missingness(sample, var_ids)
+Yearly_Missingness(sample, var_independent)
 
 Yearly_Missingness(sample, var_outcomes) 
 
-Yearly_Missingness(sample, var_covariates) # remove multi-racial
-var_covariates <- var_covariates[-match("total_enrollment_multi_tot", var_covariates)]
-
-Yearly_Missingness(sample, var_expend) # will need to drop some of these
-to_drop <- c(
-    "research01",
-    "research02",
-    "opermain02",
-    "hospital01",
-    "hospital02",
-    "independ01",
-    "independ02",
-    "otheroper01",
-    "otheroper02"
-)
-var_expend <- var_expend[-match(to_drop, var_expend)]
-Yearly_Missingness(sample, var_expend) 
-rm(to_drop)
+Yearly_Missingness(sample, var_covariates) 
 
 Yearly_Missingness(sample, var_normalizers)
 
 ### Drop schools missing covariates / independent variables for the whole time
+
 #function checks if every entry for that group is missing the variable for 13 years (or more) 
 missing_var <- function(varlist,data){
   missing_var <- NULL
@@ -521,17 +540,17 @@ missing_var <- function(varlist,data){
   return(missing_var)
 }
 
-missing_var(c(var_expend,var_outcomes,var_covariates,var_normalizers),sample)
+missing_var(c(var_independent,var_outcomes,var_covariates,var_normalizers),sample)
 
-missing_var(var_expend,sample) # Missingness here
+missing_var(var_independent,sample)
 missing_var(var_outcomes,sample)
-missing_var(var_covariates,sample) # Missingness here
+missing_var(var_covariates,sample) #all missingness for every year contained in these variables.
 missing_var(var_normalizers,sample)
 
-length(unique(missing_var(c(var_expend,var_outcomes,var_covariates,var_normalizers),sample)))
-#13 schools missing some covariates in every year - drop these schools.
+length(unique(missing_var(c(var_independent,var_outcomes,var_covariates,var_normalizers),sample)))
+#4 schools missing some covariates in every year - drop these schools.
 
-drop <- missing_var(c(var_expend,var_outcomes,var_covariates,var_normalizers),sample)
+drop <- missing_var(c(var_independent,var_outcomes,var_covariates,var_normalizers),sample)
 keep = 1 - (sample$groupid %in% drop) 
 
 sample <- sample[(keep==1),]
@@ -540,108 +559,16 @@ rm(keep)
 rm(drop)
 
 # Keep track of how may schools lost / still in sample
-num_schools - length(unique(sample$groupid)) # 15 schools dropped
+num_schools - length(unique(sample$groupid)) # 4 schools dropped
 num_schools <- length(unique(sample$groupid)) # replace number of schools we have
-num_schools # 432
+num_schools # 441
 
-### Check Missing values again
-# Check missing value now
-Yearly_Missingness(sample, var_ids)
-
-Yearly_Missingness(sample, var_outcomes) 
-
-Yearly_Missingness(sample, var_covariates) 
-
-Yearly_Missingness(sample, var_expend)
-
-Yearly_Missingness(sample, var_normalizers)
-
-# Check summaries
-apply(sample[var_expend],MARGIN =2,FUN = summary)
-
-apply(sample[var_outcomes],MARGIN =2,FUN = summary) 
-
-apply(sample[var_covariates],MARGIN =2,FUN = summary)
-
-apply(sample[var_normalizers],MARGIN =2,FUN = summary) 
-
-
-
-##### IMPUTE MISSING VALUES FOR KEY VARIABLES AND ONLY KEEP VARIABLES WE NEED
-### Recode categorical variables in data as such
-sample$groupid <- as.factor(sample$groupid)
-sample$academicyear <- as.factor(sample$academicyear)
-sample$state <- as.factor(sample$state)
-sample$census_division <- as.factor(sample$census_division)
-
-### Standardize monetary variables to 2015 values
-# Define function to rescale to 2015 dollars for a specified index
-inflation_transform <- function(data, varlist, index){
-  for(var in varlist){
-    data[ ,paste(var, "_", index, sep ="")] <- data[ ,var]/data[ ,paste(index, "_scalar_2015", sep="")]  # (current yr $) / (current yr $ / 2015 $) = (2015 $)
-  }
-  return(data)
-}
-
-# Define variables we want to standardize
-var_cpi <- c(
-  "grant01",
-  "state03",
-  "nettuition01",
-  "tot_rev_w_auxother_sum",
-  var_expend
-)
-
-# Standardize
-sample <- inflation_transform(sample, var_cpi, "cpi")
-
-### Impute
-# Define variables we want to impute for
-vars_impute <- c(
-  var_covariates[-match(intersect(var_cpi, var_covariates), var_covariates)],
-  paste(var_cpi, "_cpi", sep=""),
-  "fte_count"
-)
-
-# Impute by doing fixed effects model with groupid and year
-for(var in vars_impute){
-  model <- lm(sample[, var] ~ sample$groupid + sample$academicyear)
-  indeces <- is.na(sample[, var])
-  n <- sum(indeces)
-  sample[indeces, var] <- predict(model, newdata=sample)[indeces]
-  print(paste(var, ": ", n, " change(s) made"))
-  
-  rm(list=c("var", "model", "n"))
-}
-
-### Use imputed cpi variables to fill in values for original variables
-for(var in var_cpi){
-  indeces <- is.na(sample[, var])
-  sample[indeces, var] <- sample[indeces, paste(var, "_cpi", sep="")] * sample[indeces, "cpi_scalar_2015"]
-}
-
-### Remove cpi variables from data
-sample <- sample[, -match(paste(var_cpi, "_cpi", sep=""), names(sample))]
-
-### Check missing rates to be sure
-Yearly_Missingness(sample, var_ids)
-
-Yearly_Missingness(sample, var_outcomes) 
-
-Yearly_Missingness(sample, var_covariates) 
-
-Yearly_Missingness(sample, var_expend)
-
-Yearly_Missingness(sample, var_normalizers)
-
-
+### Impute Values where there are very few missing values
+# NEED TO ADD CODE HERE
 
 ##### MAKE/GET VARIABLES WE NEED FOR ANALYSIS
-### Only keep variables we intend on using
-sample <- sample[, c(var_ids, var_normalizers, var_expend, var_covariates, var_outcomes)]
-
 ### Merge with unemployment and GDP
-# Load unemployment and GDP datasets
+# Load gdp and unemployment datasets
 load("data/Working_Data/GDP Per Capita 2003-2015.Rda")
 load("data/Working_Data/Unemployment 2003-2015.Rda")
 
@@ -662,10 +589,22 @@ sample$pct_other <- 100 -(sample$pct_black + sample$pct_hisp + sample$pct_white 
 sample$pct_urm <- sample$pct_black + sample$pct_hisp
 sample$pct_nonurm <- sample$pct_white + sample$pct_asian
 
+
+
+
+
 ### Create a variable that's the total spent on education
-#sample$education_ttl <- sample$instruction01 + sample$studserv01
+sample$education_ttl <- sample$instruction01 + sample$studserv01
 
 ### Transform variables into 2015 dollars and/or per FTE
+# Define function to rescale to 2015 dollars for a specified index
+inflation_transform <- function(data, varlist, index){
+  for(var in varlist){
+    data[ ,paste(var, "_", index, sep ="")] <- data[ ,var]/data[ ,paste(index, "_scalar_2015", sep="")]  # (current yr $) / (current yr $ / 2015 $) = (2015 $)
+  }
+  return(data)
+}
+
 # Define function to rescale to per FTE
 fte_transform <- function(data, varlist){
   for(var in varlist){
@@ -690,11 +629,13 @@ sample <- fte_transform(sample, var_fte_only)
 
 # Rescale to 2015 dollars key variables (using cpi) AND fte
 var_cpi_fte <- c(
+  "instruction01",
+  "studserv01",
+  "education_ttl",
+  "instruction02",
   "grant01",
   "state03",
-  "nettuition01",
-  "tot_rev_w_auxother_sum",
-  var_expend
+  "nettuition01"
 )
 
 sample <- inflation_transform(sample, var_cpi_fte, "cpi")
@@ -706,9 +647,7 @@ names(sample)
 ids <- c("groupid","academicyear")
 sample_allvar <- merge(data,sample[,ids],by =ids)
 
-
-
-##### FINAL TOUCHES AND SAVE
+#### FINAL TOUCHES AND SAVE
 ### Sort
 sample <- sample[order(sample$groupid, sample$academicyear), ]
 
