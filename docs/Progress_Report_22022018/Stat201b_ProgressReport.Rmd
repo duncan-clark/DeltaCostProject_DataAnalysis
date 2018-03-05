@@ -31,7 +31,7 @@ We reviewed two research papers that used this data to examine the impact of Out
 We would like to look more into the literature time permitting, and investigate if there have been other attempts to model such data flexibly. 
 
 ####Data Preparation:
-We first found and cleaned data on state and year specific GDP per capita and unemployment so they could be merged with our final dataset, as the two studies above included them in their models. Because graduation rates are only available starting in academic year 2003, we started by keeping years past then in the data, which left us with 553 institutions. We then thinned our sample out in the following way:
+We first found and cleaned data on state and year specific GDP per capita and unemployment rates so they could be merged with our final dataset, as the two studies above included them in their models. Because graduation rates are only available starting in academic year 2003, we started by keeping years past then in the data, which left us with 553 institutions. We then thinned our sample out in the following way:
 
 -	Kept schools in the 50 states plus DC (544 institutions kept)
 -	Dropped schools that didn't exist in the entirety of the time range, academic years 2003-2015 (505 institutions kept)
@@ -52,15 +52,15 @@ We identified our primary outcome of interest in the data as the percentage of s
 - Include variables to represent overall socio-economic deprevation of student population.
 - Include expenditure variables.
 
-In a simple classical linear regression model, we see that each of the following intial variables are significant:
+In a simple classical linear regression model, we see that each of the following initial variables are significant:
 
-- Pell grants $s per full time equivalent(fte) student
+- Pell grants $ per full time equivalent(fte) student
 - Percentage of black students
 - Percentage of hispanic students
 - Instruction spending
 - Student service spending  
 
-This gives us confidence that we should be able to find some model that fits the data well with a some kind of positive relation with spending. From which we can hopefully draw an interpretation.
+This gives us confidence that we should be able to find some model that fits the data well with a some kind of positive relation with spending. From this, we can hopefully draw an interpretation.
 
 ####Model Selection
 We used lasso to do automatic variable selection. We ran into the problem of missing data for around 300 of our around 400 covariates. We initially replaced the missing covariates with mean values, and ran lasso to give a selection of variables. We then ran the same model but restricted to covariates with no missingness. These two approaches yielded different selections of variables. Noting that the top coefficients in the first approach had low levels of missingness i.e. <200 in 4000 observations, we took a hybrid approach, including all covariates with missingness <200.
@@ -76,7 +76,7 @@ Also we have education spending variables in great granularity, so we could pote
 ####Other Ideas
 It seems highly doubtful that our data is truly linear, and moreover, universities may differ significantly in intangible ways not captured by the covariates, e.g. reputational factors. We would like to explore using more flexible modelling techniques e.g. kernalised method, to predict the effect of changing a variable e.g. the effect of an increase in student service spending. We could do this on both our self and lasso selected variables and compare the differences.
 
-We will us the training data set to train the models, and then the test data set to see if they have out of sample validity. Strong out of sample validity lends credibility to any interpretations we will draw from our models.
+We will use the training data set to train the models, and then the test data set to see if they have out of sample validity. Strong out of sample validity lends credibility to any interpretations we will draw from our models.
 
 
 
