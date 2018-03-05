@@ -8,7 +8,7 @@ munging: TRUE
 logging: FALSE
 logging_level: INFO
 load_libraries: TRUE
-libraries: reshape, plyr, dplyr, ggplot2, readstata13, glmnet, stringr, fit, lubridate
+libraries: reshape, plyr, dplyr, ggplot2, readstata13, glmnet, stringr, margins, fit, lubridate
 as_factors: TRUE
 data_tables: FALSE
 attach_internal_libraries: FALSE
