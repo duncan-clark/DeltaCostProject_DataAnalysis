@@ -4,6 +4,8 @@ rm(list=ls())
 
 ### Libraries
 library(glmnet)
+library(KRLS)
+library(bigKRLS)
 
 ### Read in Data
 load("cache/sample.RData")
@@ -330,6 +332,10 @@ summary(as.vector(GR_Ridge$beta))
 
 round(abs(GR_LM$coefficients - GR_Ridge$beta) / abs(GR_LM$coefficients), 4)
 
+# Save models
+save(GR_LM, file="cache/GR_LM")
+save(GR_Ridge, file="cache/GR_Ridge")
+
 ### Bachelor's Degrees
 # Regular LM
 Bach_LM <- lm(Y2~X_Bach+0)
@@ -356,6 +362,19 @@ summary(Bach_LM$coefficients)
 summary(as.vector(Bach_Ridge$beta))
 
 round(abs(Bach_LM$coefficients - Bach_Ridge$beta) / abs(Bach_LM$coefficients), 4)
+
+# Save models
+save(Bach_LM, file="cache/Bach_LM")
+save(Bach_Ridge, file="cache/Bach_Ridge")
+
+
+##### RUN KERNEL REGRESSION ON DATA
+### Graduation Rate
+Ker_GR <- bigKRLS(X=X, y=Y1) # lambda = 2.61471
+Ker_GR <- krls(X=X, y=Y1, lambda=2.61471)
+
+### Bachelor's Degrees
+Ker_Bach <- bigKRLS(X=X, y=Y1)
 
 
 
