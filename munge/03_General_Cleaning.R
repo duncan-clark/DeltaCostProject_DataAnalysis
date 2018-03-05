@@ -10,7 +10,6 @@ rm(list=ls())
 
 ### Libraries
 library(readstata13)
-library(mice)
 
 ### Create a function that will table or summarize all variables in a dataset
 Data_Table <- function(data, varlist=names(data)) {
