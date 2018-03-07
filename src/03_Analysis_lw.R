@@ -137,7 +137,7 @@ save(Bach_LM_Int, file="cache/Bach_LM_Int.rda")
 ### Grad-rate
 # No interactions
 set.seed(34238)
-lambdas <- seq(10^-7, 10^-3, length.out = 10000)
+lambdas <- seq(10^-8, 10^-4, length.out = 10000)
 cv_lasso_gr <- cv.glmnet(x = X,
                          y = Y1,
                          family = "gaussian",
@@ -145,7 +145,7 @@ cv_lasso_gr <- cv.glmnet(x = X,
                          standardize=T,
                          intercept=T,
                          lambda = lambdas)
-which(round(lambdas, 7)==round(cv_lasso_gr$lambda.min, 7)) # try a smaller range
+which(round(lambdas, 8)==round(cv_lasso_gr$lambda.min, 8)) # try a smaller range
 
 plot(cv_lasso_gr$lambda, cv_lasso_gr$cvm, type="l")
 lambda_gr <- cv_lasso_gr$lambda.min
@@ -338,23 +338,23 @@ rm(lambda_bach)
 ##### KERNEL REGRESSION (GAUSSIAN KERNEL)
 ### Graduation Rate
 # Run model
-GR_Ker <- bigKRLS(X=X, y=Y1)
+#GR_Ker <- bigKRLS(X=X, y=Y1)
 
 # Save
-save(GR_Ker, file="cache/GR_Ker.rda")
+#save(GR_Ker, file="cache/GR_Ker.rda")
 
 # Load
-#load("cache/GR_Ker.rda")
+load("cache/GR_Ker.rda")
 
 ### Bachelor's Degrees
 # Run model
-Bach_Ker <- bigKRLS(X=X, y=Y2)
+#Bach_Ker <- bigKRLS(X=X, y=Y2)
 
 # Save
-save(Bach_Ker, file="cache/Bach_Ker.rda")
+#save(Bach_Ker, file="cache/Bach_Ker.rda")
 
 # Load
-#load("cache/Bach_Ker.rda")
+load("cache/Bach_Ker.rda")
 
 
 
@@ -400,7 +400,6 @@ N <- nrow(X)
 
 K_Test <- matrix(rep(0, n*N), nrow=n)
 for(i in 1:n){
-  if(trunc(i/50)==i/50) print(i)
   for(j in 1:N){
     test <- X_Test_Standard[i, ]
     train <- X_Standard[j, ]
@@ -418,6 +417,8 @@ rm(N)
 rm(X_Test_Standard)
 rm(X_Standard)
 
+save(K_Test, file="cache/K_Test.rda")
+
 ### See the testing errors for each model
 # Define outcomes and models
 outcomes <- c("GR", "Bach")
@@ -430,11 +431,11 @@ for(o in outcomes){
   # Get the right outcome
   y <- Y1_Test
   y_sd <- sd(training$grad_rate_150_p4yr)
-  #y_mean <- mean(training$grad_rate_150_p4yr)
+  y_mean <- mean(training$grad_rate_150_p4yr)
   
   if(o=="Bach") y <- Y2_Test
   if(o=="Bach") y_sd <- sd(training$bachelordegrees_fte)
-  #if(o=="Bach") y_mean <- mean(training$bachelordegrees_fte)
+  if(o=="Bach") y_mean <- mean(training$bachelordegrees_fte)
   
   # Loop through the models
   for(m in models){
@@ -447,9 +448,8 @@ for(o in outcomes){
     if(m=="LM")yhat_int <- cbind(1, X_Test_Int) %*% model_int$coefficients
     if(m %in% c("Lasso", "Ridge"))yhat <- predict(model, newx=X_Test)
     if(m %in% c("Lasso", "Ridge"))yhat_int <- predict(model_int, newx=X_Test_Int)
-    #if(m=="Ker")yhat <- (K_Test %*% model$coeffs) * y_sd + y_mean
-    if(m=="Ker")yhat <- K_Test %*% model$coeffs
-    
+    if(m=="Ker")yhat <- (K_Test %*% model$coeffs) * y_sd + y_mean
+
     # Get RMSE
     RMSE <- sqrt(mean((y - yhat)^2))
     if(m!="Ker") RMSE_int <- sqrt(mean((y - yhat_int)^2))
@@ -485,7 +485,7 @@ GR_Derivatives <- cbind(as.matrix(GR_LM$coefficients[-1]), as.matrix(GR_Lasso$be
 GR_Derivatives <- cbind(GR_Derivatives, as.matrix(GR_Ridge$beta))
 #GR_Derivatives <- cbind(GR_Derivatives, t(as.matrix(GR_Ker$avgderivatives)) * sd(Y1))
 GR_Derivatives <- cbind(GR_Derivatives, t(as.matrix(GR_Ker$avgderivatives)))
-GR_Derivatives <- round(GR_Derivatives, 5)
+GR_Derivatives <- round(GR_Derivatives, 7)
 rownames(GR_Derivatives) <- colnames(X)
 View(GR_Derivatives) # Signs of the Kernel model seem to make more intuitive sense (urm, pell grants, and instruction01)
 
@@ -501,11 +501,11 @@ GR_Derivatives <- cbind(t(as.matrix(GR_Ker$avgderivatives)), sqrt(t(as.matrix(GR
 GR_Derivatives <- data.frame(GR_Derivatives)
 names(GR_Derivatives) <- c("avg", "se")
 GR_Derivatives$p <- 2*(1-pnorm(abs(GR_Derivatives$avg / GR_Derivatives$se)))
-GR_Derivatives <- round(GR_Derivatives, 5)
+GR_Derivatives <- round(GR_Derivatives, 7)
 GR_Derivatives <- GR_Derivatives[expense_var, ]
 GR_Derivatives <- GR_Derivatives[GR_Derivatives$p < .05, ]
-View(GR_Derivatives) # most positive are student services and auxiliary (auxiliary01_cpi_fte most)
-                     # most negative is instsupp01_cpi_fte
+View(GR_Derivatives) # most positive are student services and auxiliary (auxiliary02_cpi_fte most)
+                     # most negative is instsupp02_cpi_fte
 
 # Bachelor's per FTE
 #Bach_Derivatives <- cbind(t(as.matrix(Bach_Ker$avgderivatives)) * sd(Y2), sqrt(t(as.matrix(Bach_Ker$var.avgderivatives))) * sd(Y2))
@@ -513,10 +513,10 @@ Bach_Derivatives <- cbind(t(as.matrix(Bach_Ker$avgderivatives)), sqrt(t(as.matri
 Bach_Derivatives <- data.frame(Bach_Derivatives)
 names(Bach_Derivatives) <- c("avg", "se")
 Bach_Derivatives$p <- 2*(1-pnorm(abs(Bach_Derivatives$avg / Bach_Derivatives$se)))
-Bach_Derivatives <- round(Bach_Derivatives, 5)
+Bach_Derivatives <- round(Bach_Derivatives, 7)
 Bach_Derivatives <- Bach_Derivatives[expense_var,]
 Bach_Derivatives <- Bach_Derivatives[Bach_Derivatives$p < .05, ]
-View(Bach_Derivatives) # Most positive are student services and auxiliary (auxiliary02_cpi_fte most)
+View(Bach_Derivatives) # Most positive are student services and auxiliary (studserv02_cpi_fte most)
                        # Most negative is pubserv02_cpi_fte
 
 
@@ -558,12 +558,14 @@ rm(n)
 rm(N)
 rm(X_Standard)
 
+save(K_Original, file="K_Original.rda")
+
 ### Graduation Rate Kernel Matrix
 # Created altered matrix
 names(analysis_data)
 GR_Altered <- analysis_data[4:46]
-GR_Altered$auxiliary01_cpi_fte <- GR_Altered$auxiliary01_cpi_fte + 1
-GR_Altered$instsupp01_cpi_fte <- GR_Altered$instsupp01_cpi_fte - 1
+GR_Altered$auxiliary02_cpi_fte <- GR_Altered$auxiliary02_cpi_fte + 1
+GR_Altered$instsupp02_cpi_fte <- GR_Altered$instsupp02_cpi_fte - 1
 GR_Altered <- as.matrix(GR_Altered)
 
 GR_Altered <- GR_Altered - (Ones %*% X_Training_Means)
@@ -593,11 +595,13 @@ rm(n)
 rm(N)
 rm(X_Standard)
 
+save(K_GR, file="K_GR.rda")
+
 ### Bachelor's Kernel Matrix
 # Create altered matrix
 names(analysis_data)
 Bach_Altered <- analysis_data[4:46]
-Bach_Altered$auxiliary02_cpi_fte <- Bach_Altered$auxiliary02_cpi_fte + 1
+Bach_Altered$studserv02_cpi_fte <- Bach_Altered$studserv02_cpi_fte + 1
 Bach_Altered$pubserv02_cpi_fte <- Bach_Altered$pubserv02_cpi_fte - 1
 Bach_Altered <- as.matrix(Bach_Altered)
 
@@ -628,17 +632,19 @@ rm(n)
 rm(N)
 rm(X_Standard)
 
+save(K_Bach, file="K_Bach.rda")
+
 ### Graduation Rate First Difference
 # Grad Rate Estimate
 #GR_Ker_FD <- sd(Y1)*mean((GR_Altered %*% GR_Ker$coeffs) - (Original %*% GR_Ker$coeffs))
-GR_Ker_FD <- mean((K_GR %*% GR_Ker$coeffs) - (K_Original %*% GR_Ker$coeffs))
+GR_Ker_FD <- mean((K_GR %*% GR_Ker$coeffs) - (K_Original %*% GR_Ker$coeffs))*sd(Y1)
 GR_Ker_FD
 
 save(GR_Ker_FD, file="cache/GR_Ker_FD.rda")
 
 # Bachelor Estimate
 #Bach_Ker_FD <- sd(Y2)*mean((Bach_Altered %*% Bach_Ker$coeffs) - (Original %*% Bach_Ker$coeffs))
-Bach_Ker_FD <- mean((K_Bach %*% Bach_Ker$coeffs) - (K_Original %*% Bach_Ker$coeffs))
+Bach_Ker_FD <- mean((K_Bach %*% Bach_Ker$coeffs) - (K_Original %*% Bach_Ker$coeffs))*sd(Y2)
 Bach_Ker_FD
 
 save(Bach_Ker_FD, file="cache/Bach_Ker_FD.rda")
@@ -648,16 +654,36 @@ GR_Bootstrap_FD <- NULL
 Bach_Bootstrap_FD <- NULL
 
 set.seed(43289)
-for(i in 1:50){
+for(i in 1:100){
   # Get schools and length of unique schools
   schools <- unique(training$groupid)
   m <- length(schools)
   
-  # Create new data matrix
+  # Create new data and kernel matrix
   data <- NULL
+  K_Original_B <- NULL
+  K_GR_B <- NULL
+  K_Bach_B <- NULL
+  
   for(i in 1:m){
-    sub <- training[training$groupid==sample(schools, 1), ]
+    # Get school
+    s <- sample(schools, 1)
+    
+    # Data
+    sub <- training[training$groupid==s, ]
     data <- rbind(data, sub)
+    
+    # Original
+    sub <- K_Original[, training$groupid==s]
+    K_Original_B <- cbind(K_Original_B, sub)
+
+    # GR
+    sub <- K_GR[, training$groupid==s]
+    K_GR_B <- cbind(K_GR_B, sub)
+
+    # Bachelor's
+    sub <- K_Bach[, training$groupid==s]
+    K_Bach_B <- cbind(K_Bach_B, sub)
   }
   
   # Get new x and y
@@ -670,8 +696,8 @@ for(i in 1:50){
   Bach_B_c <- bigKRLS(X = X_B, y = Y2_B, derivative = F, vcov.est = F, lambda=Bach_Ker$lambda)$coeffs
   
   # Get FD
-  GR_B_FD <- mean((K_GR %*% GR_B_c) - (K_Original %*% GR_B_c))
-  Bach_B_FD <- mean((K_GR %*% Bach_B_c) - (K_Original %*% Bach_B_c))
+  GR_B_FD <- mean((K_GR_B %*% GR_B_c) - (K_Original_B %*% GR_B_c))*sd(Y1_B)
+  Bach_B_FD <- mean((K_GR_B %*% Bach_B_c) - (K_Original_B %*% Bach_B_c))*sd(Y2_B)
   
   # Add to vectors
   GR_Bootstrap_FD <- c(GR_Bootstrap_FD, GR_B_FD)
@@ -682,6 +708,9 @@ for(i in 1:50){
   rm(schools)
   rm(m)
   rm(data)
+  rm(K_Original_B)
+  rm(K_GR_B)
+  rm(K_Bach_B)
   rm(sub)
   rm(X_B)
   rm(Y1_B)
