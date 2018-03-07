@@ -644,6 +644,8 @@ sample <- sample[, c(var_ids, var_normalizers, var_expend, var_covariates, var_o
 load("data/Working_Data/GDP Per Capita 2003-2015.Rda")
 load("data/Working_Data/Unemployment 2003-2015.Rda")
 
+unemployment_data$state[unemployment_data$state==""] <- "AL"
+
 # Merge
 sample <- merge(sample, gdp_data, by = c("academicyear","state"))
 sum(is.na(sample$gdp_per_capita)) # 0

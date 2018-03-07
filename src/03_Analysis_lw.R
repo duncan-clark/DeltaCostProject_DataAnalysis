@@ -10,25 +10,6 @@ library(bigKRLS)
 ### Read in Data
 load("cache/sample.RData")
 
-### Create a function that will table or summarize all variables in a dataset
-Data_Table <- function(data, varlist=names(data)) {
-  in_data <- names(data)[names(data) %in% varlist]
-  for(var in in_data){
-    print(paste("---------", deparse(substitute(data)), ": ", var, "-----------", sep=" "), quote=FALSE)
-    table <- table(data[,var], useNA="ifany")
-    if(is.na(names(table)[length(table)])) names(table)[length(table)] <- "NA"
-    table <- data.frame(t(rbind(table, prop.table(table)*100)))
-    names(table) <- c("Number", "Percentage")
-    table$Percentage <- paste(as.character(round(table$Percentage, digits=2)), "%", sep="")
-    print(table, quote=FALSE)
-    print("", quote=FALSE)
-    print("", quote=FALSE)
-    rm("table")
-    
-    rm("var")
-  } # end of for(var in names(data)[names(data) %in% varlist])
-} # end of function(data, varlist=names(data))
-
 ### Create dummy variables 
 # Years
 yr_dummies <- model.matrix(~sample$academicyear)
@@ -73,7 +54,6 @@ rm(vars_to_keep)
 set.seed(201)
 
 # Choose 20% of each region to go to the test set, rounding down to whole states.
-
 split <- data.frame(groupid =unique(analysis_data$groupid),test=0)
 blocks <- as.numeric(levels(as.factor(analysis_data$census_division)))
 
@@ -95,201 +75,267 @@ testing <- analysis_data[which((analysis_data$groupid %in% split$groupid[split$t
 rm(blocks)
 rm(split)
 
-
-
-##### LASSO
-### Standardize training set
+### Prepare scaled training X and Y
+# Regular X and Y
 names(training)
 
-X <- scale(training[, 4:46])
-Y1 <- scale(training$grad_rate_150_p4yr)
-Y2 <- scale(training$bachelordegrees_fte)
+X <- as.matrix(training[, 4:46])
+Y1 <- as.matrix(training$grad_rate_150_p4yr)
+Y2 <- as.matrix(training$bachelordegrees_fte)
 
-### Add in interaction terms between all the expense variables
-X_int <- data.frame(X)
-names(X_int)
+# X with interaction terms
+names(training)
+X_Int <- training[, 4:46]
+names(X_Int)
 
-expense_var <- names(X_int)[9:23]
+expense_var <- names(X_Int)[9:23]
 
 for(e in expense_var[1:(length(expense_var)-1)]){
   for(var in expense_var[(which(expense_var==e)+1):length(expense_var)]){
-    X_int <- cbind(X_int, X_int[, e]*X_int[, var])
-    names(X_int)[ncol(X_int)] <- paste(e, "*", var)
+    X_Int <- cbind(X_Int, X_Int[, e]*X_Int[, var])
+    names(X_Int)[ncol(X_Int)] <- paste(e, "*", var)
   }
   
   rm(e)
   rm(var)
 }
 
-X_int <- as.matrix(X_int)
+X_Int <- as.matrix(X_Int)
 
-### Lasso
-# Grad-rate
-set.seed(34238)
-lambdas <- seq(10^-4, 1, length.out = 10000)
-cv_lasso_gr <- cv.glmnet(x = X_int,
-                          y = Y1,
-                          family = "gaussian",
-                          alpha = 1,
-                          standardize=F,
-                          lambda = lambdas)
-which(round(lambdas, 4)==round(cv_lasso_gr$lambda.min, 4)) # try a smaller range
 
+
+##### LM
+### Grad Rate
+# No interactions
+GR_LM <- lm(Y1 ~ X)
+summary(GR_LM)
+
+save(GR_LM, file="cache/GR_LM.rda")
+
+# Interactions
+GR_LM_Int <- lm(Y1 ~ X_Int)
+summary(GR_LM_Int)
+
+save(GR_LM_Int, file="cache/GR_LM_Int.rda")
+
+### Bachelor's degrees
+# No interactions
+Bach_LM <- lm(Y2 ~ X)
+summary(Bach_LM)
+
+save(Bach_LM, file="cache/Bach_LM.rda")
+
+# Interactions
+Bach_LM_Int <- lm(Y2 ~ X_Int)
+summary(Bach_LM_Int)
+
+save(Bach_LM_Int, file="cache/Bach_LM_Int.rda")
+
+
+
+##### LASSO
+### Grad-rate
+# No interactions
 set.seed(34238)
-lambdas <- seq(10^-5, 10^-1, length.out = 10000)
-cv_lasso_gr <- cv.glmnet(x = X_int,
+lambdas <- seq(10^-7, 10^-3, length.out = 10000)
+cv_lasso_gr <- cv.glmnet(x = X,
                          y = Y1,
                          family = "gaussian",
                          alpha = 1,
-                         standardize=F,
+                         standardize=T,
+                         intercept=T,
                          lambda = lambdas)
-which(lambdas==cv_lasso_gr$lambda.min) # Try smaller range
-
-set.seed(34238)
-lambdas <- seq(10^-6, 10^-2, length.out = 10000)
-cv_lasso_gr <- cv.glmnet(x = X_int,
-                         y = Y1,
-                         family = "gaussian",
-                         alpha = 1,
-                         standardize=F,
-                         lambda = lambdas)
-which(lambdas==cv_lasso_gr$lambda.min) # Stop here
+which(round(lambdas, 7)==round(cv_lasso_gr$lambda.min, 7)) # try a smaller range
 
 plot(cv_lasso_gr$lambda, cv_lasso_gr$cvm, type="l")
 lambda_gr <- cv_lasso_gr$lambda.min
 
-GR_Lasso <- glmnet(x=X_int, y=Y1, family="gaussian", alpha=1, standardize = F, lambda=lambda_gr)
-GR_Lasso$beta # We'll try drop interaction terms that have coefficients of 0
+GR_Lasso <- glmnet(x=X, y=Y1, family="gaussian", alpha=1, standardize = T, intercept=T, lambda=lambda_gr)
+GR_Lasso$beta
 
 save(GR_Lasso, file="cache/GR_Lasso.rda")
 
-# Bachelor's per FTE
+rm(lambdas)
+rm(cv_lasso_gr)
+rm(lambda_gr)
+
+# With interactions
 set.seed(34238)
-lambdas <- seq(10^-4, 1, length.out = 10000)
-cv_lasso_bach <- cv.glmnet(x = X_int,
-                         y = Y2,
+lambdas <- seq(10^-7, 10^-3, length.out = 10000)
+cv_lasso_gr <- cv.glmnet(x = X_Int,
+                         y = Y1,
                          family = "gaussian",
                          alpha = 1,
-                         standardize=F,
+                         standardize=T,
+                         intercept=T,
                          lambda = lambdas)
-which(round(lambdas, 4)==round(cv_lasso_bach$lambda.min, 4)) # try a smaller range
+which(round(lambdas, 7)==round(cv_lasso_gr$lambda.min, 7)) # try a smaller range
 
+plot(cv_lasso_gr$lambda, cv_lasso_gr$cvm, type="l")
+lambda_gr <- cv_lasso_gr$lambda.min
+
+GR_Lasso_Int <- glmnet(x=X_Int, y=Y1, family="gaussian", alpha=1, standardize = T, intercept=T, lambda=lambda_gr)
+GR_Lasso_Int$beta
+
+save(GR_Lasso_Int, file="cache/GR_Lasso_Int.rda")
+
+rm(lambdas)
+rm(cv_lasso_gr)
+rm(lambda_gr)
+
+### Bachelor's per FTE
+# No interactions
 set.seed(34238)
-lambdas <- seq(10^-5, 10^-1, length.out = 10000)
-cv_lasso_bach <- cv.glmnet(x = X_int,
+lambdas <- seq(10^-8, 10^-4, length.out = 10000)
+cv_lasso_bach <- cv.glmnet(x = X,
                            y = Y2,
                            family = "gaussian",
                            alpha = 1,
-                           standardize=F,
+                           standardize=T,
+                           intercept=T,
                            lambda = lambdas)
-which(lambdas==cv_lasso_bach$lambda.min) # try a smaller range
-
-set.seed(34238)
-lambdas <- seq(10^-6, 10^-2, length.out = 10000)
-cv_lasso_bach <- cv.glmnet(x = X_int,
-                           y = Y2,
-                           family = "gaussian",
-                           alpha = 1,
-                           standardize=F,
-                           lambda = lambdas)
-which(lambdas==cv_lasso_bach$lambda.min) # Stick with this
+which(round(lambdas, 8)==round(cv_lasso_bach$lambda.min, 8)) # try a smaller range
 
 plot(cv_lasso_bach$lambda, cv_lasso_bach$cvm, type="l")
 lambda_bach <- cv_lasso_bach$lambda.min
 
-Bach_Lasso <- glmnet(x=X_int, y=Y2, family="gaussian", alpha=1, standardize = F, lambda=lambda_bach)
+Bach_Lasso <- glmnet(x=X, y=Y2, family="gaussian", alpha=1, standardize = T, intercept=T, lambda=lambda_bach)
 Bach_Lasso$beta
 
 save(Bach_Lasso, file="cache/Bach_Lasso.rda")
 
+rm(lambdas)
+rm(cv_lasso_bach)
+rm(lambda_bach)
 
-
-##### RUN REGULAR AND RIDGE REGRESSION WITH INTERACTION TERMS 
-#####   AFTER DROPPING INTERACTION TERMS WITH 0 COEFFICIENTS FROM LASSO
-### Remove interaction terms from data that had coefficients of 0
-# Get lists of int terms that had 0 coefficients from each model
-colnames(X_int)
-sum(1-(colnames(X_int)==rownames(GR_Lasso$beta))) # 0
-
-int_terms <- as.vector(colnames(X_int)[44:ncol(X_int)])
-
-gr_int0 <- intersect(colnames(X_int)[as.vector(GR_Lasso$beta==0)], int_terms)
-bach_int0 <- intersect(colnames(X_int)[as.vector(Bach_Lasso$beta==0)], int_terms)
-
-# Remove those terms from the data
-X_GR <- X_int
-X_GR <- X_GR[, -match(gr_int0, colnames(X_GR))]
-ncol(X_GR)
-
-X_Bach <- X_int
-X_Bach <- X_Bach[, -match(bach_int0, colnames(X_Bach))]
-ncol(X_Bach)
-
-### Graduation Rate
-# Regular LM
-GR_LM <- lm(Y1~X_GR+0)
-GR_LM$coefficients
-
-# Ridge
+# With interactions
 set.seed(34238)
-lambdas <- seq(10^-9, 10^-5, length.out = 10000)
-cv_ridge_gr <- cv.glmnet(x = X_GR,
-                           y = Y1,
+lambdas <- seq(10^-8, 10^-4, length.out = 10000)
+cv_lasso_bach <- cv.glmnet(x = X_Int,
+                           y = Y2,
                            family = "gaussian",
-                           alpha = 0,
-                           standardize=F,
-                           lambda = lambdas) 
-which(lambdas==cv_ridge_gr$lambda.min) # Stick with this
+                           alpha = 1,
+                           standardize=T,
+                           intercept=T,
+                           lambda = lambdas)
+which(round(lambdas, 8)==round(cv_lasso_bach$lambda.min, 8)) # try a smaller range
+
+plot(cv_lasso_bach$lambda, cv_lasso_bach$cvm, type="l")
+lambda_bach <- cv_lasso_bach$lambda.min
+
+Bach_Lasso_Int <- glmnet(x=X_Int, y=Y2, family="gaussian", alpha=1, standardize = T, intercept=T, lambda=lambda_bach)
+Bach_Lasso_Int$beta
+
+save(Bach_Lasso_Int, file="cache/Bach_Lasso_Int.rda")
+
+rm(lambdas)
+rm(cv_lasso_bach)
+rm(lambda_bach)
+
+
+
+##### RIDGE
+### Grad-rate
+# No interactions
+set.seed(34238)
+lambdas <- seq(10^-7, 10^-3, length.out = 10000)
+cv_ridge_gr <- cv.glmnet(x = X,
+                         y = Y1,
+                         family = "gaussian",
+                         alpha = 0,
+                         standardize=T,
+                         intercept=T,
+                         lambda = lambdas)
+which(round(lambdas, 7)==round(cv_ridge_gr$lambda.min, 7)) # try a smaller range
+
 plot(cv_ridge_gr$lambda, cv_ridge_gr$cvm, type="l")
 lambda_gr <- cv_ridge_gr$lambda.min
 
-GR_Ridge <- glmnet(X_GR, Y1, family="gaussian", lambda=lambda_gr, alpha=0, standardize=F)
+GR_Ridge <- glmnet(x=X, y=Y1, family="gaussian", alpha=0, standardize = T, intercept=T, lambda=lambda_gr)
 GR_Ridge$beta
 
-# Check differences
-summary(GR_LM$coefficients)
-summary(as.vector(GR_Ridge$beta))
-
-round(abs(GR_LM$coefficients - GR_Ridge$beta) / abs(GR_LM$coefficients), 4)
-
-# Save models
-save(GR_LM, file="cache/GR_LM.rda")
 save(GR_Ridge, file="cache/GR_Ridge.rda")
 
-### Bachelor's Degrees
-# Regular LM
-Bach_LM <- lm(Y2~X_Bach+0)
-Bach_LM$coefficients
+rm(lambdas)
+rm(cv_ridge_gr)
+rm(lambda_gr)
 
-# Ridge
+# With interactions
 set.seed(34238)
-lambdas <- seq(10^-5, 10^-1, length.out = 10000)
-cv_ridge_bach <- cv.glmnet(x = X_Bach,
-                         y = Y2,
+lambdas <- seq(10^-6, 10^-2, length.out = 10000)
+cv_ridge_gr <- cv.glmnet(x = X_Int,
+                         y = Y1,
                          family = "gaussian",
                          alpha = 0,
-                         standardize=F,
-                         lambda = lambdas) 
-which(lambdas==cv_ridge_bach$lambda.min) # Stick with this
+                         standardize=T,
+                         intercept=T,
+                         lambda = lambdas)
+which(round(lambdas, 6)==round(cv_ridge_gr$lambda.min, 6)) # try a smaller range
+
+plot(cv_ridge_gr$lambda, cv_ridge_gr$cvm, type="l")
+lambda_gr <- cv_ridge_gr$lambda.min
+
+GR_Ridge_Int <- glmnet(x=X_Int, y=Y1, family="gaussian", alpha=0, standardize = T, intercept=T, lambda=lambda_gr)
+GR_Ridge_Int$beta
+
+save(GR_Ridge_Int, file="cache/GR_Ridge_Int.rda")
+
+rm(lambdas)
+rm(cv_ridge_gr)
+rm(lambda_gr)
+
+### Bachelor's per FTE
+# No interactions
+set.seed(34238)
+lambdas <- seq(10^-7, 10^-3, length.out = 10000)
+cv_ridge_bach <- cv.glmnet(x = X,
+                           y = Y2,
+                           family = "gaussian",
+                           alpha = 0,
+                           standardize=T,
+                           intercept=T,
+                           lambda = lambdas)
+which(round(lambdas, 7)==round(cv_ridge_bach$lambda.min, 7)) # try a smaller range
+
 plot(cv_ridge_bach$lambda, cv_ridge_bach$cvm, type="l")
 lambda_bach <- cv_ridge_bach$lambda.min
 
-Bach_Ridge <- glmnet(X_Bach, Y2, family="gaussian", lambda=lambda_bach, alpha=0, standardize=F)
+Bach_Ridge <- glmnet(x=X, y=Y2, family="gaussian", alpha=0, standardize = T, intercept=T, lambda=lambda_bach)
 Bach_Ridge$beta
 
-# Check differences
-summary(Bach_LM$coefficients)
-summary(as.vector(Bach_Ridge$beta))
-
-round(abs(Bach_LM$coefficients - Bach_Ridge$beta) / abs(Bach_LM$coefficients), 4)
-
-# Save models
-save(Bach_LM, file="cache/Bach_LM.rda")
 save(Bach_Ridge, file="cache/Bach_Ridge.rda")
 
+rm(lambdas)
+rm(cv_ridge_bach)
+rm(lambda_bach)
+
+# With interactions
+set.seed(34238)
+lambdas <- seq(10^-7, 10^-3, length.out = 10000)
+cv_ridge_bach <- cv.glmnet(x = X_Int,
+                           y = Y2,
+                           family = "gaussian",
+                           alpha = 0,
+                           standardize=T,
+                           intercept=T,
+                           lambda = lambdas)
+which(round(lambdas, 7)==round(cv_ridge_bach$lambda.min, 7)) # try a smaller range
+
+plot(cv_ridge_bach$lambda, cv_ridge_bach$cvm, type="l")
+lambda_bach <- cv_ridge_bach$lambda.min
+
+Bach_Ridge_Int <- glmnet(x=X_Int, y=Y2, family="gaussian", alpha=0, standardize = T, intercept=T, lambda=lambda_bach)
+Bach_Ridge_Int$beta
+
+save(Bach_Ridge_Int, file="cache/Bach_Ridge_Int.rda")
+
+rm(lambdas)
+rm(cv_ridge_bach)
+rm(lambda_bach)
 
 
-##### RUN KERNEL REGRESSION ON DATA
+
+##### KERNEL REGRESSION (GAUSSIAN KERNEL)
 ### Graduation Rate
 # Run model
 GR_Ker <- bigKRLS(X=X, y=Y1)
@@ -297,7 +343,8 @@ GR_Ker <- bigKRLS(X=X, y=Y1)
 # Save
 save(GR_Ker, file="cache/GR_Ker.rda")
 
-rm(temp)
+# Load
+#load("cache/GR_Ker.rda")
 
 ### Bachelor's Degrees
 # Run model
@@ -306,111 +353,344 @@ Bach_Ker <- bigKRLS(X=X, y=Y2)
 # Save
 save(Bach_Ker, file="cache/Bach_Ker.rda")
 
-rm(temp)
+# Load
+#load("cache/Bach_Ker.rda")
 
 
 
 ##### SEE HOW EACH MODEL DOES ON THE TESTING SET
-### Get SD and Mean from Training set
-names(training)
-temp <- as.matrix(training[, 4:48])
+### Prepare Testing Set
+Y1_Test <- testing[, 47] 
+Y2_Test <- testing[, 48]
 
-Training_Means <- t(as.matrix(apply(temp, 2, mean)))
-Training_SDs <- t(as.matrix(apply(temp, 2, sd)))
-
-rm(temp)
-
-### Standardize X and Y from testing Set
-Test_Standard <- as.matrix(testing[, 4:48])
-Ones <- as.matrix(rep(1, nrow(Test_Standard)))
-
-Test_Standard <- Test_Standard - (Ones %*% Training_Means)
-Test_Standard <- Test_Standard / (Ones %*% Training_SDs)
-
-rm(Ones)
-
-### Add correct interaction terms to Testing X
-# Extract X and Y
-colnames(Test_Standard)
-
-X_Test <- Test_Standard[, 1:43]
-Y1_Test <- Test_Standard[, 44]
-Y2_Test <- Test_Standard[, 45]
-
-# Add interaction Terms
-X_Test <- data.frame(X_Test)
-expense_var
-
+# Standardize X from testing Set
+X_Test_Int <- testing[, 4:46]
 for(e in expense_var[1:(length(expense_var)-1)]){
   for(var in expense_var[(which(expense_var==e)+1):length(expense_var)]){
-    X_Test <- cbind(X_Test, X_Test[, e]*X_Test[, var])
-    names(X_Test)[ncol(X_Test)] <- paste(e, "*", var)
+    X_Test_Int <- cbind(X_Test_Int, X_Test_Int[, e]*X_Test_Int[, var])
+    names(X_Test_Int)[ncol(X_Test_Int)] <- paste(e, "*", var)
   }
   
   rm(e)
   rm(var)
 }
+X_Test_Int <- as.matrix(X_Test_Int)
 
-X_Test <- as.matrix(X_Test)
+X_Test <- X_Test_Int[, 1:43]
 
-X_Test_GR <- X_Test[, -match(gr_int0, colnames(X_Test))]
-X_Test_Bach <- X_Test[, -match(bach_int0, colnames(X_Test))]
+# Prepare Kernel for the testing X
+X_Training_Means <- t(as.matrix(apply(X, 2, mean)))
+X_Training_SDs <- t(as.matrix(apply(X, 2, sd)))
+
+sum(1-(colnames(X_Test)==colnames(X_Training_Means))) # 0
+sum(1-(colnames(X_Test)==colnames(X_Training_SDs))) # 0
+
+Ones <- as.matrix(rep(1, nrow(X_Test)))
+
+X_Test_Standard <- X_Test
+X_Test_Standard <- X_Test_Standard - (Ones %*% X_Training_Means)
+X_Test_Standard <- X_Test_Standard / (Ones %*% X_Training_SDs)
+
+rm(Ones)
+
+X_Standard <- scale(X)
+
+n <- nrow(X_Test)
+N <- nrow(X)
+
+K_Test <- matrix(rep(0, n*N), nrow=n)
+for(i in 1:n){
+  if(trunc(i/50)==i/50) print(i)
+  for(j in 1:N){
+    test <- X_Test_Standard[i, ]
+    train <- X_Standard[j, ]
+    K_Test[i, j] <- exp(-(norm(test-train, type="2")^2)/ncol(X))
+  }
+  
+  rm(i)
+  rm(j)
+  rm(test)
+  rm(train)
+}
+
+rm(n)
+rm(N)
+rm(X_Test_Standard)
+rm(X_Standard)
 
 ### See the testing errors for each model
-# Grad Rate - Lasso
-dim(X_Test)
-length(GR_Lasso$beta)
+# Define outcomes and models
+outcomes <- c("GR", "Bach")
+models <- c("LM", "Lasso", "Ridge", "Ker")
 
-sum(1-(colnames(X_Test)==rownames(GR_Lasso$beta)))
+# Get RMSE (scaled and unscaled) and testing R^2 for each model
+for(o in outcomes){
+  # Print the outcome
+  print(paste("---", o, "---", sep=""))
+  # Get the right outcome
+  y <- Y1_Test
+  y_sd <- sd(training$grad_rate_150_p4yr)
+  #y_mean <- mean(training$grad_rate_150_p4yr)
+  
+  if(o=="Bach") y <- Y2_Test
+  if(o=="Bach") y_sd <- sd(training$bachelordegrees_fte)
+  #if(o=="Bach") y_mean <- mean(training$bachelordegrees_fte)
+  
+  # Loop through the models
+  for(m in models){
+    # grab models
+    model <- globalenv()[[paste(o, "_", m, sep="")]]
+    if(m!="Ker") model_int <- globalenv()[[paste(o, "_", m, "_Int", sep="")]]
+    
+    # Get predicted values
+    if(m=="LM")yhat <- cbind(1,X_Test) %*% model$coefficients
+    if(m=="LM")yhat_int <- cbind(1, X_Test_Int) %*% model_int$coefficients
+    if(m %in% c("Lasso", "Ridge"))yhat <- predict(model, newx=X_Test)
+    if(m %in% c("Lasso", "Ridge"))yhat_int <- predict(model_int, newx=X_Test_Int)
+    #if(m=="Ker")yhat <- (K_Test %*% model$coeffs) * y_sd + y_mean
+    if(m=="Ker")yhat <- K_Test %*% model$coeffs
+    
+    # Get RMSE
+    RMSE <- sqrt(mean((y - yhat)^2))
+    if(m!="Ker") RMSE_int <- sqrt(mean((y - yhat_int)^2))
+    
+    # Get R2
+    #R2 <- (sum((y - mean(y))^2) - sum((y - yhat)^2))/sum((y - mean(y))^2)
+    #if(m!="Ker") R2_int <- (sum((y - mean(y))^2) - sum((y - yhat_int)^2))/sum((y - mean(y))^2)
+    
+    # Print Results
+    print(m)
+    print(paste("RMSE: ", round(RMSE, 4), "(", round(RMSE/y_sd, 4), " standardized)"))
+    #print(paste("R^2: ", round(R2, 4)))
+    if(m!="Ker") print(paste("RMSE (w/ Int.): ", round(RMSE_int, 4), "(", round(RMSE_int/y_sd, 4), " standardized)"))
+    #if(m!="Ker") print(paste("R^2 (Interactions): ", round(R2_int, 4)))
+    print("", quote=F)
+  }
+  
+  rm(o)
+  rm(m)
+  rm(y)
+  rm(y_sd)
+  #rm(y_mean)
+  rm(model)
+  rm(model_int)
+  rm(yhat)
+  rm(yhat_int)
+  rm(RMSE)
+  rm(RMSE_int)
+} # Kernel Models do the best on both outcomes
 
-mean((Y1_Test - (X_Test %*% GR_Lasso$beta))^2) # 0.9256324
-(sum((Y1_Test - mean(Y1_Test))^2) - sum((Y1_Test - (X_Test %*% GR_Lasso$beta))^2)) / sum((Y1_Test - mean(Y1_Test))^2) # 0.1992744
+### Check derivatives of the GR models
+GR_Derivatives <- cbind(as.matrix(GR_LM$coefficients[-1]), as.matrix(GR_Lasso$beta))
+GR_Derivatives <- cbind(GR_Derivatives, as.matrix(GR_Ridge$beta))
+#GR_Derivatives <- cbind(GR_Derivatives, t(as.matrix(GR_Ker$avgderivatives)) * sd(Y1))
+GR_Derivatives <- cbind(GR_Derivatives, t(as.matrix(GR_Ker$avgderivatives)))
+GR_Derivatives <- round(GR_Derivatives, 5)
+rownames(GR_Derivatives) <- colnames(X)
+View(GR_Derivatives) # Signs of the Kernel model seem to make more intuitive sense (urm, pell grants, and instruction01)
 
-# Grad Rate - LM and Ridge
-dim(X_Test_GR)
-length(GR_LM$coefficients)
-length(GR_Ridge$beta)
+rm(GR_Derivatives)
 
-sum(1-(paste("X_GR", colnames(X_Test_GR), sep="")==names(GR_LM$coefficients)))
-sum(1-(colnames(X_Test_GR)==rownames(GR_Ridge$beta)))
 
-mean((Y1_Test - (X_Test_GR %*% GR_LM$coefficients))^2) # 0.6053765
-(sum((Y1_Test - mean(Y1_Test))^2) - sum((Y1_Test - (X_Test_GR %*% GR_LM$coefficients))^2)) / sum((Y1_Test - mean(Y1_Test))^2) # 0.4763143
 
-mean((Y1_Test - (X_Test_GR %*% GR_Ridge$beta))^2) # 0.9644693
-(sum((Y1_Test - mean(Y1_Test))^2) - sum((Y1_Test - (X_Test_GR %*% GR_Ridge$beta))^2)) / sum((Y1_Test - mean(Y1_Test))^2) # 0.1656782
+##### EXAMINE RESULTS
+### Get Derivative Matrices
+# Grad Rate
+#GR_Derivatives <- cbind(t(as.matrix(GR_Ker$avgderivatives)) * sd(Y1), sqrt(t(as.matrix(GR_Ker$var.avgderivatives))) * sd(Y1))
+GR_Derivatives <- cbind(t(as.matrix(GR_Ker$avgderivatives)), sqrt(t(as.matrix(GR_Ker$var.avgderivatives))))
+GR_Derivatives <- data.frame(GR_Derivatives)
+names(GR_Derivatives) <- c("avg", "se")
+GR_Derivatives$p <- 2*(1-pnorm(abs(GR_Derivatives$avg / GR_Derivatives$se)))
+GR_Derivatives <- round(GR_Derivatives, 5)
+GR_Derivatives <- GR_Derivatives[expense_var, ]
+GR_Derivatives <- GR_Derivatives[GR_Derivatives$p < .05, ]
+View(GR_Derivatives) # most positive are student services and auxiliary (auxiliary01_cpi_fte most)
+                     # most negative is instsupp01_cpi_fte
 
-# Grad Rate - Kernel
-X_Test_noint <- Test_Standard[, 1:43]
+# Bachelor's per FTE
+#Bach_Derivatives <- cbind(t(as.matrix(Bach_Ker$avgderivatives)) * sd(Y2), sqrt(t(as.matrix(Bach_Ker$var.avgderivatives))) * sd(Y2))
+Bach_Derivatives <- cbind(t(as.matrix(Bach_Ker$avgderivatives)), sqrt(t(as.matrix(Bach_Ker$var.avgderivatives))))
+Bach_Derivatives <- data.frame(Bach_Derivatives)
+names(Bach_Derivatives) <- c("avg", "se")
+Bach_Derivatives$p <- 2*(1-pnorm(abs(Bach_Derivatives$avg / Bach_Derivatives$se)))
+Bach_Derivatives <- round(Bach_Derivatives, 5)
+Bach_Derivatives <- Bach_Derivatives[expense_var,]
+Bach_Derivatives <- Bach_Derivatives[Bach_Derivatives$p < .05, ]
+View(Bach_Derivatives) # Most positive are student services and auxiliary (auxiliary02_cpi_fte most)
+                       # Most negative is pubserv02_cpi_fte
 
-mean((Y1_Test - predict(GR_Ker, X_Test_noint)$predicted)^2) 
-(sum((Y1_Test - mean(Y1_Test))^2) - sum((Y1_Test - predict(GR_Ker, X_Test_noint)$predicted)^2)) / sum((Y1_Test - mean(Y1_Test))^2) 
 
-# Bach - Lasso
-dim(X_Test)
-length(Bach_Lasso$beta)
 
-sum(1-(colnames(X_Test)==rownames(Bach_Lasso$beta)))
+##### KERNEL FIRST DIFFERENCES
+### Create X Training Means, Sds, and Ones vector
+X_Training_Means <- t(as.matrix(apply(X, 2, mean)))
+X_Training_SDs <- t(as.matrix(apply(X, 2, sd)))
+Ones <- as.matrix(rep(1, nrow(analysis_data)))
 
-mean((Y2_Test - (X_Test %*% Bach_Lasso$beta))^2) # 1.161551
-(sum((Y2_Test - mean(Y2_Test))^2) - sum((Y2_Test - (X_Test %*% Bach_Lasso$beta))^2)) / sum((Y2_Test - mean(Y2_Test))^2) # -0.3539167
+### Original Kernel Matrix
+names(analysis_data)
+Original <- as.matrix(analysis_data[4:46])
 
-# Bach - LM and Ridge
-dim(X_Test_Bach)
-length(Bach_LM$coefficients)
-length(Bach_Ridge$beta)
+Original <- Original - (Ones %*% X_Training_Means)
+Original <- Original / (Ones %*% X_Training_SDs)
 
-sum(1-(paste("X_Bach", colnames(X_Test_Bach), sep="")==names(Bach_LM$coefficients)))
-sum(1-(colnames(X_Test_Bach)==rownames(Bach_Ridge$beta)))
+# Create kernel
+X_Standard <- scale(X)
 
-mean((Y2_Test - (X_Test_Bach %*% Bach_LM$coefficients))^2) # 1.222239
-(sum((Y2_Test - mean(Y2_Test))^2) - sum((Y2_Test - (X_Test_Bach %*% Bach_LM$coefficients))^2)) / sum((Y2_Test - mean(Y2_Test))^2) # -0.4246554
+n <- nrow(Original)
+N <- nrow(X)
 
-mean((Y2_Test - (X_Test_Bach %*% Bach_Ridge$beta))^2) # 1.209067
-(sum((Y2_Test - mean(Y2_Test))^2) - sum((Y2_Test - (X_Test_Bach %*% Bach_Ridge$beta))^2)) / sum((Y2_Test - mean(Y2_Test))^2) # -0.4093017
+K_Original <- matrix(rep(0, n*N), nrow=n)
+for(i in 1:n){
+  for(j in 1:N){
+    test <- Original[i, ]
+    train <- X_Standard[j, ]
+    K_Original[i, j] <- exp(-(norm(test-train, type="2")^2)/ncol(X))
+  }
+  
+  rm(i)
+  rm(j)
+  rm(test)
+  rm(train)
+}
 
-# Bach - Kernel
-X_Test_noint <- Test_Standard[, 1:43]
+rm(n)
+rm(N)
+rm(X_Standard)
 
-mean((Y2_Test - predict(Bach_Ker, X_Test_noint)$predicted)^2) 
-(sum((Y2_Test - mean(Y2_Test))^2) - sum((Y2_Test - predict(Bach_Ker, X_Test_noint)$predicted)^2)) / sum((Y2_Test - mean(Y2_Test))^2) 
+### Graduation Rate Kernel Matrix
+# Created altered matrix
+names(analysis_data)
+GR_Altered <- analysis_data[4:46]
+GR_Altered$auxiliary01_cpi_fte <- GR_Altered$auxiliary01_cpi_fte + 1
+GR_Altered$instsupp01_cpi_fte <- GR_Altered$instsupp01_cpi_fte - 1
+GR_Altered <- as.matrix(GR_Altered)
+
+GR_Altered <- GR_Altered - (Ones %*% X_Training_Means)
+GR_Altered <- GR_Altered / (Ones %*% X_Training_SDs)
+
+# Create kernel
+X_Standard <- scale(X)
+
+n <- nrow(GR_Altered)
+N <- nrow(X)
+
+K_GR <- matrix(rep(0, n*N), nrow=n)
+for(i in 1:n){
+  for(j in 1:N){
+    test <- GR_Altered[i, ]
+    train <- X_Standard[j, ]
+    K_GR[i, j] <- exp(-(norm(test-train, type="2")^2)/ncol(X))
+  }
+  
+  rm(i)
+  rm(j)
+  rm(test)
+  rm(train)
+}
+
+rm(n)
+rm(N)
+rm(X_Standard)
+
+### Bachelor's Kernel Matrix
+# Create altered matrix
+names(analysis_data)
+Bach_Altered <- analysis_data[4:46]
+Bach_Altered$auxiliary02_cpi_fte <- Bach_Altered$auxiliary02_cpi_fte + 1
+Bach_Altered$pubserv02_cpi_fte <- Bach_Altered$pubserv02_cpi_fte - 1
+Bach_Altered <- as.matrix(Bach_Altered)
+
+Bach_Altered <- Bach_Altered - (Ones %*% X_Training_Means)
+Bach_Altered <- Bach_Altered / (Ones %*% X_Training_SDs)
+
+# Create kernel
+X_Standard <- scale(X)
+
+n <- nrow(Bach_Altered)
+N <- nrow(X)
+
+K_Bach <- matrix(rep(0, n*N), nrow=n)
+for(i in 1:n){
+  for(j in 1:N){
+    test <- Bach_Altered[i, ]
+    train <- X_Standard[j, ]
+    K_Bach[i, j] <- exp(-(norm(test-train, type="2")^2)/ncol(X))
+  }
+  
+  rm(i)
+  rm(j)
+  rm(test)
+  rm(train)
+}
+
+rm(n)
+rm(N)
+rm(X_Standard)
+
+### Graduation Rate First Difference
+# Grad Rate Estimate
+#GR_Ker_FD <- sd(Y1)*mean((GR_Altered %*% GR_Ker$coeffs) - (Original %*% GR_Ker$coeffs))
+GR_Ker_FD <- mean((K_GR %*% GR_Ker$coeffs) - (K_Original %*% GR_Ker$coeffs))
+GR_Ker_FD
+
+save(GR_Ker_FD, file="cache/GR_Ker_FD.rda")
+
+# Bachelor Estimate
+#Bach_Ker_FD <- sd(Y2)*mean((Bach_Altered %*% Bach_Ker$coeffs) - (Original %*% Bach_Ker$coeffs))
+Bach_Ker_FD <- mean((K_Bach %*% Bach_Ker$coeffs) - (K_Original %*% Bach_Ker$coeffs))
+Bach_Ker_FD
+
+save(Bach_Ker_FD, file="cache/Bach_Ker_FD.rda")
+
+# Cluster Bootstrap
+GR_Bootstrap_FD <- NULL
+Bach_Bootstrap_FD <- NULL
+
+set.seed(43289)
+for(i in 1:50){
+  # Get schools and length of unique schools
+  schools <- unique(training$groupid)
+  m <- length(schools)
+  
+  # Create new data matrix
+  data <- NULL
+  for(i in 1:m){
+    sub <- training[training$groupid==sample(schools, 1), ]
+    data <- rbind(data, sub)
+  }
+  
+  # Get new x and y
+  X_B <- as.matrix(data[, 4:46])
+  Y1_B <- data$grad_rate_150_p4yr
+  Y2_B <- data$bachelordegrees_fte
+  
+  # Get new coefficients
+  GR_B_c <- bigKRLS(X = X_B, y = Y1_B, derivative = F, vcov.est = F, lambda=GR_Ker$lambda)$coeffs
+  Bach_B_c <- bigKRLS(X = X_B, y = Y2_B, derivative = F, vcov.est = F, lambda=Bach_Ker$lambda)$coeffs
+  
+  # Get FD
+  GR_B_FD <- mean((K_GR %*% GR_B_c) - (K_Original %*% GR_B_c))
+  Bach_B_FD <- mean((K_GR %*% Bach_B_c) - (K_Original %*% Bach_B_c))
+  
+  # Add to vectors
+  GR_Bootstrap_FD <- c(GR_Bootstrap_FD, GR_B_FD)
+  Bach_Bootstrap_FD <- c(Bach_Bootstrap_FD, Bach_B_FD)
+  
+  # Clear environment
+  rm(i)
+  rm(schools)
+  rm(m)
+  rm(data)
+  rm(sub)
+  rm(X_B)
+  rm(Y1_B)
+  rm(Y2_B)
+  rm(GR_B_c)
+  rm(Bach_B_c)
+  rm(GR_B_FD)
+  rm(Bach_B_FD)
+}
+
+save(GR_Bootstrap_FD, file="cache/GR_Bootstrap_FD.rda")
+save(Bach_Bootstrap_FD, file="cache/Bach_Bootstrap_FD.rda")
