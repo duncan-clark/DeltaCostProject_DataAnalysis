@@ -425,7 +425,13 @@ outcomes <- c("GR", "Bach")
 models <- c("LM", "Lasso", "Ridge", "Ker")
 
 # Get RMSE (scaled and unscaled) and testing R^2 for each model
+sink("logs/test_data_results_lw.txt", type="output")
+sink()
+
 for(o in outcomes){
+  # Log file
+  sink("logs/test_data_results_lw.txt", type="output", append=T)
+  
   # Print the outcome
   print(paste("---", o, "---", sep=""))
   # Get the right outcome
@@ -467,11 +473,15 @@ for(o in outcomes){
     print("", quote=F)
   }
   
+  # Stop log
+  sink()
+  
+  # Clean environment
   rm(o)
   rm(m)
   rm(y)
   rm(y_sd)
-  #rm(y_mean)
+  rm(y_mean)
   rm(model)
   rm(model_int)
   rm(yhat)
@@ -507,6 +517,8 @@ GR_Derivatives <- GR_Derivatives[GR_Derivatives$p < .05, ]
 View(GR_Derivatives) # most positive are student services and auxiliary (auxiliary02_cpi_fte most)
                      # most negative is instsupp02_cpi_fte
 
+save(GR_Derivatives, file="cache/GR_Derivatives.rda")
+
 # Bachelor's per FTE
 #Bach_Derivatives <- cbind(t(as.matrix(Bach_Ker$avgderivatives)) * sd(Y2), sqrt(t(as.matrix(Bach_Ker$var.avgderivatives))) * sd(Y2))
 Bach_Derivatives <- cbind(t(as.matrix(Bach_Ker$avgderivatives)), sqrt(t(as.matrix(Bach_Ker$var.avgderivatives))))
@@ -519,6 +531,7 @@ Bach_Derivatives <- Bach_Derivatives[Bach_Derivatives$p < .05, ]
 View(Bach_Derivatives) # Most positive are student services and auxiliary (studserv02_cpi_fte most)
                        # Most negative is pubserv02_cpi_fte
 
+save(Bach_Derivatives, file="cache/Bach_Derivatives.rda")
 
 
 ##### KERNEL FIRST DIFFERENCES
@@ -558,7 +571,7 @@ rm(n)
 rm(N)
 rm(X_Standard)
 
-save(K_Original, file="K_Original.rda")
+save(K_Original, file="cache/K_Original.rda")
 
 ### Graduation Rate Kernel Matrix
 # Created altered matrix
@@ -595,7 +608,7 @@ rm(n)
 rm(N)
 rm(X_Standard)
 
-save(K_GR, file="K_GR.rda")
+save(K_GR, file="cache/K_GR.rda")
 
 ### Bachelor's Kernel Matrix
 # Create altered matrix
@@ -632,7 +645,7 @@ rm(n)
 rm(N)
 rm(X_Standard)
 
-save(K_Bach, file="K_Bach.rda")
+save(K_Bach, file="cache/K_Bach.rda")
 
 ### Graduation Rate First Difference
 # Grad Rate Estimate
@@ -654,7 +667,11 @@ GR_Bootstrap_FD <- NULL
 Bach_Bootstrap_FD <- NULL
 
 set.seed(43289)
-for(i in 1:100){
+for(i in 1:50){
+  # Print the step
+  print(i)
+  print("")
+  
   # Get schools and length of unique schools
   schools <- unique(training$groupid)
   m <- length(schools)
@@ -707,6 +724,7 @@ for(i in 1:100){
   rm(i)
   rm(schools)
   rm(m)
+  rm(s)
   rm(data)
   rm(K_Original_B)
   rm(K_GR_B)
