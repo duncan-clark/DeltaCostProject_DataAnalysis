@@ -4,6 +4,7 @@
 
 # Code split into Sections ctrl f #1) #2) etc. for each section
 
+#setwd("C:/Users/Duncan/Documents/Academics/UCLA_Academics/Classes/Stats_201B/DeltaCostProject_DataAnalysis")
 library(ProjectTemplate)
 load.project()
 
@@ -38,7 +39,6 @@ numbers_nas <- apply(sample_reg_train[,as.logical(1-no_na)], MARGIN =2, function
 summary(numbers_nas)
 #number of nas is skewed by a few columns with all nas, median of around 1/6 of observations, suggests
 #that throwing all these variables away would cause loss of information.
-
 
 ## Approach1 replaces the nas with the mean for that column
 sample_reg_train1 <- sample_reg_train
@@ -257,10 +257,16 @@ cbind(as.character(comparison[1:10,3]),sapply(comparison[1:10,3],
 ##probably shouldn't use this anyhow due to missingness
 ## missingness not really a problem for other variables barring sat scores.
 
-###Approach 3 
+#####Approach 3 #####
+
 ##remove variables that are obviously multicolinear, based on intuition and the above regularised regressions
+
 ##take hybrid between approaches 1 and 2, allow variables with missingness if it is less than say arbitrarily 200 observations out of 4000 = approx. 5%
+##as per LW approach impute the missing variables with a fixed effects model based on region and year.
+
 ##need to code discrete variables as factors so we don't give continous jumps and actually include discrete effects.
+
+##need to scale our monetary variables by inflation
 
 sample_reg_train3 <- sample_reg_train
 
@@ -269,20 +275,28 @@ covariates_drop <-  c("ftretention_rate", "grscohortpct","totaldegrees_100fte","
 sample_reg_train3 <- sample_reg_train[,-match(covariates_drop,colnames(sample_reg_train))]
 
 #remove variables with more than 200 nas
-
 numbers_nas <- apply(sample_reg_train3, MARGIN =2,
                      function(x){sum(is.na(x))})
 sample_reg_train3 <- sample_reg_train3[,as.logical((1-(numbers_nas >=200)))]
 
-# replace Nas with column means
-col_means <- apply(as.matrix(sample_reg_train3), MARGIN =2, function(x){mean(x, na.rm = TRUE)})
+numbers_nas <- apply(sample_reg_train3, MARGIN =2,
+                    function(x){sum(is.na(x))})
 
-for(i in 1:length(sample_reg_train3[1,])){
-  sample_reg_train3[is.na(sample_reg_train3[,i]),i] <- col_means[i]
+#impute missing values:
+
+vars_impute <- match(colnames(sample_reg_train3[,as.logical((1-(numbers_nas == 0)))]),colnames(sample_reg_train3))
+
+for(i in vars_impute){
+  sample_reg_train3 <- as.data.frame(sample_reg_train3)
+  model <- lm(sample_reg_train3[,i] ~ sample_reg_train3$academicyear + sample_reg_train3$census_division)
+  tmp <- is.na(sample_reg_train3[,i])
+  sample_reg_train3[tmp,i] <- predict(model,newdata = sample_reg_train3)[tmp]
 }
 
 numbers_nas <- apply(sample_reg_train3, MARGIN =2, function(x){sum(is.na(x))})
+
 summary(numbers_nas)
+
 
 #define function to look for variables that should be coded as factors:
 factor_search <- function(col){
@@ -328,6 +342,22 @@ dim(sample_reg_train3)
 #213 covariate
 sample_reg_train3 <- model.matrix(~ . ,data = sample_reg_train3)
 
+#Monetary variables located manually
+tmp <- seq(match("tuition03",colnames(sample_reg_train3)),match("bachelordegrees",colnames(sample_reg_train3))-1,1)
+tmp <- c(tmp,match("ft_faculty_salary",colnames(sample_reg_train3)), match("salarytotal",colnames(sample_reg_train3)))
+#remove all that are <10 - this removes all "share of" covariates
+tmp <- tmp[-which(apply(sample_reg_train3[,tmp],2,mean)<10)]
+
+#scale by 2015_scalar
+#check we haven't changed any order
+sum(sample_allvar_train$groupid != sample_reg_train3[,match("groupid",colnames(sample_reg_train3))])
+sample_reg_train3[,tmp] <- sample_reg_train3[,tmp]*sample_allvar_train$cpi_scalar_2015
+
+#all but ft_faculty salary are totals so should be per FTE for grad rate pruposes.
+tmp <- tmp[-match("ft_faculty_salary",colnames(sample_reg_train3))]
+# one
+sample_reg_train3[,tmp] <- sample_reg_train3[,tmp]/sample_reg_train3[,match("fte_count",colnames(sample_reg_train3))]
+
 #standardise - for the numeric variables
 #find columns with factors in them
 factor_cols <- sapply(possible_factors,FUN = grep,x = colnames(sample_reg_train3))
@@ -340,6 +370,7 @@ sample_reg_train3[,-factor_cols] <-
 
 tmp <- apply(sample_reg_train3, MARGIN =2, function(x){sum(is.na(x))})
 sum(tmp)
+rm(tmp)
 #no nas 
 
 ###Lassso###
@@ -396,8 +427,8 @@ covariates_drop <- sapply(covariates_drop,FUN = grep,x = colnames(sample_reg_tra
 covariates_drop <- unlist(covariates_drop)
 
 sample_reg_train4 <- sample_reg_train3[,-covariates_drop]
-rm(covariates_drop)
 
+rm(covariates_drop)
 
 ###Lassso###
 
@@ -448,38 +479,35 @@ comparison_3 <- data.frame(beta_lasso4_biggest_names = beta_lasso4_biggest_names
 
 #No1 +tve coef = census_division2 = Middle Atlantic  NJ,NY,PA
 
-#No2 +tve coef = ft_faculty_salary
-#Need to investigate further  - could just be the variable that explains all the expediture variables
-#best
+#No2 +tve coef = bachelordegrees - totalnumber of bachelor degrees awarded
 
-#No3 +tve coef = bachelordegrees - totalnumber of bachelor degrees awarded
+#No3 +tve coef = salary_total/fte
 
-#No4 +tve coef = fall_cohort_pct - Fall cohort - Percentage of all undergraduates
-#who were first-time, full-time degree/certificate-seeking students.
-#may be getting at part timers effect.
+#No4 +tve coef = auxiliary03 = Revenues generated by or collected from the auxiliary enterprise
+#operations of the institution that exist to furnish a service to students, faculty, or staff, and that
+#charge a fee that is directly related to, although not necessarily equal to, the cost of the service. 
+#Auxiliary enterprises are managed as essentially self-supporting activities. Examples are residence halls,
+#food services, student health services, intercollegiate athletics, college unions, college stores, and movie theaters.
 
-#No5 +tve coef = HBCU - historically black universities - interesting, maybe these universities
-#perform better than others with high proporiton of black students, note that this is only racial
-#covariat that Lasso includes perhaps would have expected others - based on our ideas.
+#No5 +tve coef = census_division9 = AK, CA, HI, OR, WA
 
 
-#No1 -tve coef = fed_grant_pct
+
+#No1 -tve coef = census_division7 - AR, LA, OK, TX
+
+#No2 -tve coef = fed_grant_pct
 #higher federal grant percentages are associated with lower graduation rates.
 
-#No2 -tve coef = census_division7 - AR, LA, OK, TX
+#No3 -tve coef = census_division8 - AZ, CO, ID, NM, MT, UT, NV, WY
 
-#No3 -tve coef = total_part_time 
-#part timers effect
+#No4  -tve coef = ptug_share_of_total_pt_enrl - part timers effect
 
-#No4  -tve coef = census_division8 - AZ, CO, ID, NM, MT, UT, NV, WY
-
-#No5  -tve coef = ptug_share_of_total_pt_enrl
-#part timers effect
+#No5  -tve coef = census_division3 - IN, IL, MI, OH, WI
 
 
 ### Overall comments###
 #main things identified by lasso are part timers effect, grant effect,
-#bachelor share,ft_faculty_salary
+#bachelor degrees,faculty salary, regional effects
 #Ideas investigate these further and see if we can make any inferences.
 
 #Make lasso_covariate selection to pass to analyses
@@ -492,19 +520,53 @@ lasso_covariate_selection$covariate <- as.character(levels(lasso_covariate_selec
 lasso_covariate_selection$abs <- as.numeric(levels(lasso_covariate_selection$abs)[lasso_covariate_selection$abs])
 lasso_covariate_selection$abs<- abs(lasso_covariate_selection$abs)
 
-lasso_covariate_selection[order(lasso_covariate_selection$abs,decreasing = TRUE),]
+lasso_covariate_selection <- lasso_covariate_selection[order(lasso_covariate_selection$abs,decreasing = TRUE),]
 
 lasso_covariate_selection <- lasso_covariate_selection[-grep("census",lasso_covariate_selection$covariate),]
 lasso_covariate_selection <- lasso_covariate_selection[-grep("academicyear",lasso_covariate_selection$covariate),]
 
 
 lasso_covariate_selection <- lasso_covariate_selection$covariate[1:10]
+#10 is pretty arbitary here.
 
-#remove factor labels so match up with original names:
-lasso_covariate_selection[match("hbcu2",lasso_covariate_selection)] <- "hbcu"
-lasso_covariate_selection[match("hospital1",lasso_covariate_selection)] <- "hospital"
+##Elastic Net###
 
-sample_train_lassoed <- sample_reg_train4[,]
+lambdas <- 10^seq(3,-2,-0.01)
+
+fit_elasticnet4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                         y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                         family = "gaussian",alpha = 0.5,
+                         lambda = lambdas)
+cv_fit_elasticnet4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                               y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                               family = "gaussian",alpha = 0.5,
+                               lambda = lambdas)
+
+opt_lambda <- cv_fit_elasticnet4$lambda.min
+beta_elasticnet4 <- as.matrix(fit_elasticnet4$beta[,match(opt_lambda,lambdas)])
+
+###Ridge###
+
+lambdas <- 10^seq(3,-2,-0.01)
+
+fit_ridge4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                    y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                    family = "gaussian",alpha = 0,
+                    lambda = lambdas)
+cv_fit_ridge4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                          y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                          family = "gaussian",alpha = 0,
+                          lambda = lambdas)
+
+opt_lambda <- cv_fit_ridge4$lambda.min
+beta_ridge4 <- as.matrix(fit_ridge4$beta[,match(opt_lambda,lambdas)])
+
+
+
+
+
+
+
 
 
 

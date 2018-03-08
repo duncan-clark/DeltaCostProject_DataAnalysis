@@ -97,7 +97,7 @@ temp <- unique(data[, c("groupid", "unitid", "unitid_linchpin", "isgrouped", "ac
 temp <- temp[order(temp$groupid, temp$academicyear, temp$unitid),  ]
 groups <- tapply(temp$unitid, temp$groupid, function(x) {length(unique(x))})
 groups <- groups[groups>=2] # Only keep groupids that have more than one unitid assigned to them
-View(temp[temp$groupid %in% as.numeric(names(groups)), ]) # groupid combines some institutions
+#View(temp[temp$groupid %in% as.numeric(names(groups)), ]) # groupid combines some institutions
 temp$tag <- 1*(temp$groupid %in% as.numeric(names(groups)))
 
 tag1 = data.frame(tapply(temp$tag, temp$groupid, function(x){max(x)}))
@@ -111,7 +111,7 @@ names(tag2)[1] <- "unit_tag"
 temp <- merge(temp, tag1, all=T)
 temp <- merge(temp, tag2, all=T)
 temp <- temp[order(temp$groupid, temp$academicyear, temp$unitid),  ]
-View(temp[(temp$unit_tag== 1 | temp$group_tag==1), ]) # No unitid's assigned to more than one groupid - just use groupid
+#View(temp[(temp$unit_tag== 1 | temp$group_tag==1), ]) # No unitid's assigned to more than one groupid - just use groupid
 
 rm(list=c("temp", "groups", "tag1", "tag2"))
 
@@ -402,7 +402,7 @@ rm(total_yrs)
 # Check to see if graduation rate variables are ever part-missing
 sum(1 - (is.na(sample$grad_rate_150_n4yr)==is.na(sample$grad_rate_150_p4yr) & is.na(sample$grad_rate_150_n4yr)==is.na(sample$grad_rate_adj_cohort_n4yr)))# 6
 sample$tag[(is.na(sample$grad_rate_150_n4yr)==is.na(sample$grad_rate_150_p4yr) & is.na(sample$grad_rate_150_n4yr)==is.na(sample$grad_rate_adj_cohort_n4yr))==FALSE] <- 1
-View(sample[sample$tag==1 & !is.na(sample$tag), var_outcomes]) # will just have to drop this university - no way to recover the other two missing variables
+#View(sample[sample$tag==1 & !is.na(sample$tag), var_outcomes]) # will just have to drop this university - no way to recover the other two missing variables
 sample <- Drop_Var(sample, "tag")
 
 # Tag schools that are missing bachelor's degrees or graduation rates in a year
@@ -436,7 +436,7 @@ sample$temp[!is.na(sample$bachelordegrees) & sample$bachelordegrees==0] <- 1
 sample$temp[!is.na(sample$bachelordegrees) & !is.na(sample$associatedegrees) & sample$bachelordegrees<sample$associatedegrees] <- 1
 
 Data_Table(sample, "temp")
-View(sample[sample$temp==1, c("bachelordegrees", "associatedegrees")])
+#View(sample[sample$temp==1, c("bachelordegrees", "associatedegrees")])
 to_drop <- data.frame(tapply(sample$temp, sample$groupid, function(x){max(x)}))
 names(to_drop) <- "to_drop"
 to_drop$groupid <- as.numeric(rownames(to_drop))
@@ -474,7 +474,7 @@ Data_Table(to_check, "to_check") # 17 schools
 
 # Investigate
 sample <- merge(sample, to_check, all=T)
-View(sample[sample$to_check==1, c("groupid", "instname", "academicyear", "bachelordegrees", "total_undergraduates")])
+#View(sample[sample$to_check==1, c("groupid", "instname", "academicyear", "bachelordegrees", "total_undergraduates")])
   # Nothing implausible actually (in relation to total undergraduates on campus) - just keep them
 
 # Remove tags from the dataset
