@@ -271,9 +271,25 @@ cbind(as.character(comparison[1:10,3]),sapply(comparison[1:10,3],
 sample_reg_train3 <- sample_reg_train
 
 ###simply based on inspection from previous lasso model
-covariates_drop <-  c("ftretention_rate", "grscohortpct","totaldegrees_100fte","zip","totalcompletions_100fte")
+#check for highly correlated variables:
+tmp <- rep(0,length(sample_reg_train3[1,]))
+for(i in 1:length(tmp)){
+  tmp[i] <- cor(sample_reg_train3[,i],
+                sample_reg_train3[,match("grad_rate_150_p4yr",colnames(sample_reg_train3))])
+}
+
+tmp <- which(abs(tmp) >0.4)
+#colnames(sample_reg_train3)[tmp]
+rm(tmp)
+#many variables are pretty correlated - remove obvious outcomes. bachelordegrees, 
+
+covariates_drop <-  c("ftretention_rate", "grscohortpct","totaldegrees_100fte",
+                      "zip","totalcompletions_100fte","bachelordegrees","masterdegrees",
+                      "totaldegrees","totalcompletions","has_fte","has_instruction","has_completions","has_all","instacttype")
 sample_reg_train3 <- sample_reg_train[,-match(covariates_drop,colnames(sample_reg_train))]
 
+
+  
 #remove variables with more than 200 nas
 numbers_nas <- apply(sample_reg_train3, MARGIN =2,
                      function(x){sum(is.na(x))})
@@ -343,7 +359,7 @@ dim(sample_reg_train3)
 sample_reg_train3 <- model.matrix(~ . ,data = sample_reg_train3)
 
 #Monetary variables located manually
-tmp <- seq(match("tuition03",colnames(sample_reg_train3)),match("bachelordegrees",colnames(sample_reg_train3))-1,1)
+tmp <- seq(match("tuition03",colnames(sample_reg_train3)),match("bach_deg_share_of_tot_deg",colnames(sample_reg_train3))-1,1)
 tmp <- c(tmp,match("ft_faculty_salary",colnames(sample_reg_train3)), match("salarytotal",colnames(sample_reg_train3)))
 #remove all that are <10 - this removes all "share of" covariates
 tmp <- tmp[-which(apply(sample_reg_train3[,tmp],2,mean)<10)]
@@ -355,7 +371,7 @@ sample_reg_train3[,tmp] <- sample_reg_train3[,tmp]*sample_allvar_train$cpi_scala
 
 #all but ft_faculty salary are totals so should be per FTE for grad rate pruposes.
 tmp <- tmp[-match("ft_faculty_salary",colnames(sample_reg_train3))]
-# one
+#one
 sample_reg_train3[,tmp] <- sample_reg_train3[,tmp]/sample_reg_train3[,match("fte_count",colnames(sample_reg_train3))]
 
 #standardise - for the numeric variables
@@ -422,7 +438,8 @@ comparison_2 <- data.frame(beta_lasso3_biggest_names = beta_lasso3_biggest_names
 
 #note we are removing carnegie classification since these will likley soak up a lot of variation
 # since they are holistic classfiers of institutions.
-covariates_drop <-  c("ansi_code","oberegion","census_region","region_compact","carnegie","matched_n","unitid")
+covariates_drop <-  c("ansi_code","oberegion","census_region","region_compact","carnegie","matched_n","unitid",
+                      "cpi_index","cpi_scalar_2015","hepi_scalar_2015","hepi_index","heca_scalar_2015","heca_index")
 covariates_drop <- sapply(covariates_drop,FUN = grep,x = colnames(sample_reg_train3))
 covariates_drop <- unlist(covariates_drop)
 
@@ -430,106 +447,135 @@ sample_reg_train4 <- sample_reg_train3[,-covariates_drop]
 
 rm(covariates_drop)
 
-###Lassso###
+###Lassso### Grad_Rate
 
 lambdas <- 10^seq(3,-2,-0.01)
 
-fit_lasso4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+GR_fit_lasso4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                      y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                      family = "gaussian",alpha = 1,
                      lambda = lambdas)
-cv_fit_lasso4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+GR_cv_fit_lasso4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                            y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                            family = "gaussian",alpha = 1,
                            lambda = lambdas)
 ## Uses default 10 folds.
-plot(cv_fit_lasso3)
+#plot(GR_cv_fit_lasso3)
 
-opt_lambda <- cv_fit_lasso4$lambda.min
-beta_lasso4 <- as.matrix(fit_lasso4$beta[,match(opt_lambda,lambdas)])
+GR_opt_lambda <- GR_cv_fit_lasso4$lambda.min
+GR_beta_lasso4 <- as.matrix(GR_fit_lasso4$beta[,match(GR_opt_lambda,lambdas)])
 
 # First look at the size of the coefficients:
 
-summary(beta_lasso4)
+summary(GR_beta_lasso4)
 
 #10 biggest
-beta_lasso4_biggest <- sort(beta_lasso4,decreasing = TRUE)[1:30]
-beta_lasso4_biggest_names <- rownames(beta_lasso4)[match(beta_lasso4_biggest,beta_lasso4)]
-
-####Looking at variables with largest coefficients comments:
-#Interesting that faculty salary has big prediction value
-#total completions_FTE should be removed
-#bachelor degrees as share of total degrees also makes another appearance.
+GR_beta_lasso4_biggest <- sort(GR_beta_lasso4,decreasing = TRUE)[1:30]
+GR_beta_lasso4_biggest_names <- rownames(GR_beta_lasso4)[match(GR_beta_lasso4_biggest,GR_beta_lasso4)]
 
 #10 smallest (i.e. largest negtive values)
-beta_lasso4_smallest <- sort(beta_lasso4,decreasing = FALSE)[1:30]
-beta_lasso4_smallest_names <- rownames(beta_lasso4)[match(beta_lasso4_smallest,beta_lasso4)]
+GR_beta_lasso4_smallest <- sort(GR_beta_lasso4,decreasing = FALSE)[1:30]
+GR_beta_lasso4_smallest_names <- rownames(GR_beta_lasso4)[match(GR_beta_lasso4_smallest,GR_beta_lasso4)]
 
-comparison_3 <- data.frame(beta_lasso4_biggest_names = beta_lasso4_biggest_names,
-                           beta_lasso4_biggest = beta_lasso4_biggest,
-                           beta_lasso4_smallest_names = beta_lasso4_smallest_names,
-                           beta_lasso4_smallest = beta_lasso4_smallest
+GR_comparison_3 <- data.frame(GR_beta_lasso4_biggest_names = GR_beta_lasso4_biggest_names,
+                           GR_beta_lasso4_biggest = GR_beta_lasso4_biggest,
+                           GR_beta_lasso4_smallest_names = GR_beta_lasso4_smallest_names,
+                           GR_beta_lasso4_smallest = GR_beta_lasso4_smallest
 )
 
+GR_lasso_covariate_selection <- as.data.frame(rbind(as.matrix(GR_comparison_3[,c(1,2)],colnames = NULL),
+                                   as.matrix(GR_comparison_3[,c(3,4)],colnames = NULL)))
 
-#In general there is a lot less sparsity now allowing for area effects correctly as factors.
-#Since we have hopefully removed most of the variables that soak up a lot of the variation 
-#without being informative, we hope the variables now have some interpretation.
+names(GR_lasso_covariate_selection) <- c("covariate","abs")
+GR_lasso_covariate_selection$covariate <- as.character(levels(GR_lasso_covariate_selection$covariate)[GR_lasso_covariate_selection$covariate])
+GR_lasso_covariate_selection$abs <- as.numeric(levels(GR_lasso_covariate_selection$abs)[GR_lasso_covariate_selection$abs])
+GR_lasso_covariate_selection$abs<- abs(GR_lasso_covariate_selection$abs)
 
+GR_lasso_covariate_selection <- GR_lasso_covariate_selection[order(GR_lasso_covariate_selection$abs,decreasing = TRUE),]
 
-#No1 +tve coef = census_division2 = Middle Atlantic  NJ,NY,PA
-
-#No2 +tve coef = bachelordegrees - totalnumber of bachelor degrees awarded
-
-#No3 +tve coef = salary_total/fte
-
-#No4 +tve coef = auxiliary03 = Revenues generated by or collected from the auxiliary enterprise
-#operations of the institution that exist to furnish a service to students, faculty, or staff, and that
-#charge a fee that is directly related to, although not necessarily equal to, the cost of the service. 
-#Auxiliary enterprises are managed as essentially self-supporting activities. Examples are residence halls,
-#food services, student health services, intercollegiate athletics, college unions, college stores, and movie theaters.
-
-#No5 +tve coef = census_division9 = AK, CA, HI, OR, WA
+GR_lasso_covariate_selection <- GR_lasso_covariate_selection[-grep("census",GR_lasso_covariate_selection$covariate),]
+GR_lasso_covariate_selection <- GR_lasso_covariate_selection[-grep("academicyear",GR_lasso_covariate_selection$covariate),]
 
 
-
-#No1 -tve coef = census_division7 - AR, LA, OK, TX
-
-#No2 -tve coef = fed_grant_pct
-#higher federal grant percentages are associated with lower graduation rates.
-
-#No3 -tve coef = census_division8 - AZ, CO, ID, NM, MT, UT, NV, WY
-
-#No4  -tve coef = ptug_share_of_total_pt_enrl - part timers effect
-
-#No5  -tve coef = census_division3 - IN, IL, MI, OH, WI
-
-
-### Overall comments###
-#main things identified by lasso are part timers effect, grant effect,
-#bachelor degrees,faculty salary, regional effects
-#Ideas investigate these further and see if we can make any inferences.
-
-#Make lasso_covariate selection to pass to analyses
-
-lasso_covariate_selection <- as.data.frame(rbind(as.matrix(comparison_3[,c(1,2)],colnames = NULL),
-                                   as.matrix(comparison_3[,c(3,4)],colnames = NULL)))
-
-names(lasso_covariate_selection) <- c("covariate","abs")
-lasso_covariate_selection$covariate <- as.character(levels(lasso_covariate_selection$covariate)[lasso_covariate_selection$covariate])
-lasso_covariate_selection$abs <- as.numeric(levels(lasso_covariate_selection$abs)[lasso_covariate_selection$abs])
-lasso_covariate_selection$abs<- abs(lasso_covariate_selection$abs)
-
-lasso_covariate_selection <- lasso_covariate_selection[order(lasso_covariate_selection$abs,decreasing = TRUE),]
-
-lasso_covariate_selection <- lasso_covariate_selection[-grep("census",lasso_covariate_selection$covariate),]
-lasso_covariate_selection <- lasso_covariate_selection[-grep("academicyear",lasso_covariate_selection$covariate),]
-
-
-lasso_covariate_selection <- lasso_covariate_selection$covariate[1:10]
+GR_lasso_covariate_selection <- GR_lasso_covariate_selection$covariate[1:10]
 #10 is pretty arbitary here.
 
-##Elastic Net###
+
+###Lassso### Bach per fte
+
+Y_Bach <- sample_allvar_train$fte_count
+sample_allvar_train$instname[is.na(Y_Bach)]
+#"Southern University at New Orleans" replace with mean for speed - will make no difference
+Y_Bach[is.na(Y_Bach)] <- mean(sample_allvar_train$fte_count[sample_allvar_train$instname =="Southern University at New Orleans"],na.rm =TRUE)
+Y_Bach <- sample_allvar_train$bachelordegrees/Y_Bach
+Y_Bach <- scale(Y_Bach, center = TRUE, scale = TRUE)
+
+lambdas <- 10^seq(3,-2,-0.01)
+
+Bach_fit_lasso4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                        y = Y_Bach,
+                        family = "gaussian",alpha = 1,
+                        lambda = lambdas)
+Bach_cv_fit_lasso4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                              y= Y_Bach,
+                              family = "gaussian",alpha = 1,
+                              lambda = lambdas)
+## Uses default 10 folds.
+#plot(GR_cv_fit_lasso3)
+
+Bach_opt_lambda <- Bach_cv_fit_lasso4$lambda.min
+Bach_beta_lasso4 <- as.matrix(Bach_fit_lasso4$beta[,match(Bach_opt_lambda,lambdas)])
+
+# First look at the size of the coefficients:
+
+summary(Bach_beta_lasso4)
+
+#10 biggest
+Bach_beta_lasso4_biggest <- sort(Bach_beta_lasso4,decreasing = TRUE)[1:30]
+Bach_beta_lasso4_biggest_names <- rownames(Bach_beta_lasso4)[match(Bach_beta_lasso4_biggest,Bach_beta_lasso4)]
+
+#10 smallest (i.e. largest negtive values)
+Bach_beta_lasso4_smallest <- sort(Bach_beta_lasso4,decreasing = FALSE)[1:30]
+Bach_beta_lasso4_smallest_names <- rownames(Bach_beta_lasso4)[match(Bach_beta_lasso4_smallest,Bach_beta_lasso4)]
+
+Bach_comparison_3 <- data.frame(Bach_beta_lasso4_biggest_names = Bach_beta_lasso4_biggest_names,
+                              Bach_beta_lasso4_biggest = Bach_beta_lasso4_biggest,
+                              Bach_beta_lasso4_smallest_names = Bach_beta_lasso4_smallest_names,
+                              Bach_beta_lasso4_smallest = Bach_beta_lasso4_smallest
+)
+
+Bach_lasso_covariate_selection <- as.data.frame(rbind(as.matrix(Bach_comparison_3[,c(1,2)],colnames = NULL),
+                                                    as.matrix(Bach_comparison_3[,c(3,4)],colnames = NULL)))
+
+names(Bach_lasso_covariate_selection) <- c("covariate","abs")
+Bach_lasso_covariate_selection$covariate <- as.character(levels(Bach_lasso_covariate_selection$covariate)[Bach_lasso_covariate_selection$covariate])
+Bach_lasso_covariate_selection$abs <- as.numeric(levels(Bach_lasso_covariate_selection$abs)[Bach_lasso_covariate_selection$abs])
+Bach_lasso_covariate_selection$abs<- abs(Bach_lasso_covariate_selection$abs)
+
+Bach_lasso_covariate_selection <- Bach_lasso_covariate_selection[order(Bach_lasso_covariate_selection$abs,decreasing = TRUE),]
+
+Bach_lasso_covariate_selection <- Bach_lasso_covariate_selection[-grep("census",Bach_lasso_covariate_selection$covariate),]
+Bach_lasso_covariate_selection <- Bach_lasso_covariate_selection[-grep("academicyear",Bach_lasso_covariate_selection$covariate),]
+
+
+Bach_lasso_covariate_selection <- Bach_lasso_covariate_selection$covariate[1:10]
+#10 is pretty arbitary here.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###Elastic Net###
 
 lambdas <- 10^seq(3,-2,-0.01)
 
@@ -561,27 +607,4 @@ cv_fit_ridge4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",co
 opt_lambda <- cv_fit_ridge4$lambda.min
 beta_ridge4 <- as.matrix(fit_ridge4$beta[,match(opt_lambda,lambdas)])
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#####CACHE Data and Models#####
