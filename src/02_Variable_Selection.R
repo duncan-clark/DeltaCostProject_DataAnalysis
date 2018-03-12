@@ -285,7 +285,7 @@ rm(tmp)
 
 covariates_drop <-  c("ftretention_rate", "grscohortpct","totaldegrees_100fte",
                       "zip","totalcompletions_100fte","bachelordegrees","masterdegrees",
-                      "totaldegrees","totalcompletions","has_fte","has_instruction","has_completions","has_all","instacttype")
+                      "totaldegrees","totalcompletions","has_fte","has_instruction","has_completions","has_all","instacttype","isgrouped")
 sample_reg_train3 <- sample_reg_train[,-match(covariates_drop,colnames(sample_reg_train))]
 
 
@@ -370,9 +370,11 @@ sum(sample_allvar_train$groupid != sample_reg_train3[,match("groupid",colnames(s
 sample_reg_train3[,tmp] <- sample_reg_train3[,tmp]*sample_allvar_train$cpi_scalar_2015
 
 #all but ft_faculty salary are totals so should be per FTE for grad rate pruposes.
-tmp <- tmp[-match("ft_faculty_salary",colnames(sample_reg_train3))]
+tmp <- tmp[-match(c("ft_faculty_salary","eandr_degree"),colnames(sample_reg_train3))]
 #one
 sample_reg_train3[,tmp] <- sample_reg_train3[,tmp]/sample_reg_train3[,match("fte_count",colnames(sample_reg_train3))]
+
+#all totals 
 
 #standardise - for the numeric variables
 #find columns with factors in them
@@ -561,50 +563,97 @@ Bach_lasso_covariate_selection <- Bach_lasso_covariate_selection[-grep("academic
 Bach_lasso_covariate_selection <- Bach_lasso_covariate_selection$covariate[1:10]
 #10 is pretty arbitary here.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-###Elastic Net###
+###Elastic Net### Grad_Rate
 
 lambdas <- 10^seq(3,-2,-0.01)
 
-fit_elasticnet4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+GR_fit_elasticnet4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                          y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                          family = "gaussian",alpha = 0.5,
                          lambda = lambdas)
-cv_fit_elasticnet4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+GR_cv_fit_elasticnet4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                                y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                                family = "gaussian",alpha = 0.5,
                                lambda = lambdas)
 
-opt_lambda <- cv_fit_elasticnet4$lambda.min
-beta_elasticnet4 <- as.matrix(fit_elasticnet4$beta[,match(opt_lambda,lambdas)])
+opt_lambda <- GR_cv_fit_elasticnet4$lambda.min
+GR_beta_elasticnet4 <- as.matrix(GR_fit_elasticnet4$beta[,match(opt_lambda,lambdas)])
 
-###Ridge###
+###Elastic Net### Bachelors per FTE
 
 lambdas <- 10^seq(3,-2,-0.01)
 
-fit_ridge4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+Bach_fit_elasticnet4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                             y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                             family = "gaussian",alpha = 0.5,
+                             lambda = lambdas)
+Bach_cv_fit_elasticnet4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                                   y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                                   family = "gaussian",alpha = 0.5,
+                                   lambda = lambdas)
+
+opt_lambda <- Bach_cv_fit_elasticnet4$lambda.min
+Bach_beta_elasticnet4 <- as.matrix(Bach_fit_elasticnet4$beta[,match(opt_lambda,lambdas)])
+
+###Ridge### Grad_Rate
+
+lambdas <- 10^seq(3,-2,-0.01)
+
+GR_fit_ridge4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                     y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                     family = "gaussian",alpha = 0,
                     lambda = lambdas)
-cv_fit_ridge4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+GR_cv_fit_ridge4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                           y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
                           family = "gaussian",alpha = 0,
                           lambda = lambdas)
 
-opt_lambda <- cv_fit_ridge4$lambda.min
-beta_ridge4 <- as.matrix(fit_ridge4$beta[,match(opt_lambda,lambdas)])
+opt_lambda <- GR_cv_fit_ridge4$lambda.min
+GR_beta_ridge4 <- as.matrix(GR_fit_ridge4$beta[,match(opt_lambda,lambdas)])
+
+
+###Ridge### Bachelors per FTE
+
+lambdas <- 10^seq(3,-2,-0.01)
+
+Bach_fit_ridge4 <- glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                        y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                        family = "gaussian",alpha = 0,
+                        lambda = lambdas)
+Bach_cv_fit_ridge4 <- cv.glmnet(x = sample_reg_train4[,-match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                              y = sample_reg_train4[,match("grad_rate_150_p4yr",colnames(sample_reg_train4))],
+                              family = "gaussian",alpha = 0,
+                              lambda = lambdas)
+
+opt_lambda <- Bach_cv_fit_ridge4$lambda.min
+Bach_beta_ridge4 <- as.matrix(Bach_fit_ridge4$beta[,match(opt_lambda,lambdas)])
+
+###Find coefficients of selected variables
+
+
+GR_big <- cbind(GR_lasso_covariate_selection,GR_beta_lasso4_biggest[match(GR_lasso_covariate_selection,GR_comparison_3$GR_beta_lasso4_biggest_names)])
+
+GR_small <- cbind(GR_lasso_covariate_selection,GR_beta_lasso4_smallest[match(GR_lasso_covariate_selection,GR_comparison_3$GR_beta_lasso4_smallest_names)])
+
+Bach_big <- cbind(Bach_lasso_covariate_selection,Bach_beta_lasso4_biggest[match(Bach_lasso_covariate_selection,Bach_comparison_3$Bach_beta_lasso4_biggest_names)])
+
+Bach_small <-  cbind(Bach_lasso_covariate_selection,Bach_beta_lasso4_smallest[match(Bach_lasso_covariate_selection,Bach_comparison_3$Bach_beta_lasso4_smallest_names)])
+
+
+
+
+
+
+
+
+
+
+
+
 
 #####CACHE Data and Models#####
+
+
+
+
+

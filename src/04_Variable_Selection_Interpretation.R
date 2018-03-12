@@ -1,20 +1,23 @@
 ###This Script examines interactions and first differences with the variables selected by Lasso###
 #setwd("C:/Users/Duncan/Documents/Academics/UCLA_Academics/Classes/Stats_201B/DeltaCostProject_DataAnalysis")
 
-source("src/02_Variable_Selection.R")
+#source("src/02_Variable_Selection.R")
 
 #Test how the Lasso, Ridge and Elasticnet do on the test set with 
 #sample_reg_train4 - full data set with obvious outcomes removed.
 
-sample_train_lassoed <- sample_reg_train4[,c(grep("census_division",colnames(sample_reg_train4)),
+library(KRLS)
+library(bigKRLS)
+
+GR_sample_train_lassoed <- sample_reg_train4[,c(grep("census_division",colnames(sample_reg_train4)),
                                              grep("academicyear",colnames(sample_reg_train4)),
                                              match(c("grad_rate_150_p4yr",
-                                                lasso_covariate_selection),
+                                                GR_lasso_covariate_selection),
                                                    colnames(sample_reg_train4)))]
 
-sample_train_lassoed <- as.data.frame(sample_train_lassoed)
+GR_sample_train_lassoed <- as.data.frame(GR_sample_train_lassoed)
 
-fit_gradrate_ls <- glm(data = sample_train_lassoed,
+GR_fit_gradrate_ls <- glm(data = GR_sample_train_lassoed,
                        family="gaussian",grad_rate_150_p4yr ~ .*.)
 
 #m <- margins(fit_gradrate_ls)
@@ -40,39 +43,78 @@ census_div_margins <- function(div,data){
   formula <- paste("grad_rate_150_p4yr ~ (",formula,")^2 +",formula2)
   formula <- as.formula(formula)
   
-  fit_gradrate_ls <- glm(data =sample,family="gaussian",formula)
+  GR_fit_gradrate_ls <- glm(data =sample,family="gaussian",formula)
   
-  m<- margins(fit_gradrate_ls)
+  m<- margins(GR_fit_gradrate_ls)
   
-  print(summary(fit_gradrate_ls))
+  print(summary(GR_fit_gradrate_ls))
   print(summary(m))
 }
 
-#sapply(seq(1,9),census_div_margins,data=sample_train_lassoed) - takes a while to run
+#sapply(seq(1,9),census_div_margins,data=GR_sample_train_lassoed) - takes a while to run
 
-census_div_margins(1,sample_train_lassoed)
+census_div_margins(1,GR_sample_train_lassoed)
 
 ### This seems confusing and perhaps does not tell us all that much .... ?????
 
 ###Repeat but keep region fixed effects in and compare all at once:
 
-formula <- paste(names(sample_train_lassoed[,-c(grep("census_division",names(sample_train_lassoed)),grep("academicyear",names(sample_train_lassoed)),match("grad_rate_150_p4yr",names(sample_train_lassoed)))]),collapse = "+")
-formula2 <- paste(names(sample_train_lassoed[,grep("academicyear",names(sample_train_lassoed))]),collapse = "+")
-formula3 <- paste(names(sample_train_lassoed[,grep("census_division",names(sample_train_lassoed))]),collapse = "+")
+formula <- paste(names(GR_sample_train_lassoed[,-c(grep("census_division",names(GR_sample_train_lassoed)),grep("academicyear",names(GR_sample_train_lassoed)),match("grad_rate_150_p4yr",names(GR_sample_train_lassoed)))]),collapse = "+")
+formula2 <- paste(names(GR_sample_train_lassoed[,grep("academicyear",names(GR_sample_train_lassoed))]),collapse = "+")
+formula3 <- paste(names(GR_sample_train_lassoed[,grep("census_division",names(GR_sample_train_lassoed))]),collapse = "+")
 
 formula <- paste("grad_rate_150_p4yr ~ (",formula,")^2 +",formula2, "+",formula3)
 formula <- as.formula(formula)
 
-fit_gradrate_ls <- glm(data =sample_train_lassoed,family="gaussian",formula)
+GR_fit_ls <- glm(data =GR_sample_train_lassoed,family="gaussian",formula)
 
-m<- margins(fit_gradrate_ls)
+GR_m<- margins(GR_fit_ls)
 
-print(summary(fit_gradrate_ls))
-print(summary(m))
+print(summary(GR_fit_ls))
+print(summary(GR_m))
 
 #Margins here seem to be more what we expected - if the model fits the test data well, we 
 #hope that our interpretations based on this model are somewhat valid.
 
+
+###Bachelors per FTE###
+
+Bach_sample_train_lassoed <- sample_reg_train4[,c(grep("census_division",colnames(sample_reg_train4)),
+                                                grep("academicyear",colnames(sample_reg_train4)),
+                                                match(Bach_lasso_covariate_selection,
+                                                      colnames(sample_reg_train4)))]
+
+Bach_sample_train_lassoed <- as.data.frame(Bach_sample_train_lassoed)
+
+Bach_sample_train_lassoed <- cbind(Y_Bach,Bach_sample_train_lassoed) # Y_bach comes from variable selection script
+
+formula <- paste(names(Bach_sample_train_lassoed[,-c(grep("census_division",names(Bach_sample_train_lassoed)),grep("academicyear",names(Bach_sample_train_lassoed)),match("Y_Bach",names(Bach_sample_train_lassoed)))]),collapse = "+")
+formula2 <- paste(names(Bach_sample_train_lassoed[,grep("academicyear",names(Bach_sample_train_lassoed))]),collapse = "+")
+formula3 <- paste(names(Bach_sample_train_lassoed[,grep("census_division",names(Bach_sample_train_lassoed))]),collapse = "+")
+
+formula <- paste("Y_Bach ~ (",formula,")^2 +",formula2, "+",formula3)
+formula <- as.formula(formula)
+
+
+Bach_fit_ls <- glm(data =Bach_sample_train_lassoed,family="gaussian",formula)
+
+Bach_m<- margins(Bach_fit_ls)
+
+print(summary(Bach_fit_ls))
+print(summary(Bach_m))
+
+###Kernalised Approach with Lassoed Variables
+#Commented out so does not run since each kernel model takes ~ 2hours to run.
+
+tmp <- match("grad_rate_150_p4yr",names(GR_sample_train_lassoed))
+#GR_Ker_allvar <- bigKRLS(y=GR_sample_train_lassoed[,tmp],X = as.matrix(GR_sample_train_lassoed[,-tmp]))
+#save.bigKRLS(GR_Ker_allvar,model_subfolder_name = "cache")
+save(GR_Ker_allvar,file= "cache/GR_Ker_allvar")
+
+tmp <- match("Y_Bach",names(Bach_sample_train_lassoed))
+#Bach_Ker_allvar <- bigKRLS(y= Bach_sample_train_lassoed[,tmp], X = as.matrix(Bach_sample_train_lassoed[,-tmp]))
+#save.bigKRLS(Bach_Ker_allvar,model_subfolder_name = "cache")
+save(Bach_Ker_allvar,file= "cache/Bach_Ker_allvar")
 
 
 
