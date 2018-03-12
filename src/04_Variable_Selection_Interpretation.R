@@ -109,12 +109,12 @@ print(summary(Bach_m))
 tmp <- match("grad_rate_150_p4yr",names(GR_sample_train_lassoed))
 #GR_Ker_allvar <- bigKRLS(y=GR_sample_train_lassoed[,tmp],X = as.matrix(GR_sample_train_lassoed[,-tmp]))
 #save.bigKRLS(GR_Ker_allvar,model_subfolder_name = "cache")
-save(GR_Ker_allvar,file= "cache/GR_Ker_allvar")
+save(GR_Ker_allvar,file= "cache/GR_Ker_allvar.rda")
 
 tmp <- match("Y_Bach",names(Bach_sample_train_lassoed))
-#Bach_Ker_allvar <- bigKRLS(y= Bach_sample_train_lassoed[,tmp], X = as.matrix(Bach_sample_train_lassoed[,-tmp]))
+Bach_Ker_allvar <- bigKRLS(y= Bach_sample_train_lassoed[,tmp], X = as.matrix(Bach_sample_train_lassoed[,-tmp]))
 #save.bigKRLS(Bach_Ker_allvar,model_subfolder_name = "cache")
-save(Bach_Ker_allvar,file= "cache/Bach_Ker_allvar")
+save(Bach_Ker_allvar,file= "cache/Bach_Ker_allvar.rda")
 
 
 
