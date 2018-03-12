@@ -361,23 +361,23 @@ rm(lambda_bach)
 ##### KERNEL REGRESSION (GAUSSIAN KERNEL)
 ### Graduation Rate
 # Run model
-#GR_Ker <- bigKRLS(X=X, y=Y1)
+GR_Ker <- bigKRLS(X=X, y=Y1)
 
 # Save
-#save(GR_Ker, file="cache/GR_Ker.rda")
+save(GR_Ker, file="cache/GR_Ker.rda")
 
 # Load
-load("cache/GR_Ker.rda")
+#load("cache/GR_Ker.rda")
 
 ### Bachelor's Degrees
 # Run model
-#Bach_Ker <- bigKRLS(X=X, y=Y2)
+Bach_Ker <- bigKRLS(X=X, y=Y2)
 
 # Save
-#save(Bach_Ker, file="cache/Bach_Ker.rda")
+save(Bach_Ker, file="cache/Bach_Ker.rda")
 
 # Load
-load("cache/Bach_Ker.rda")
+#load("cache/Bach_Ker.rda")
 
 
 
@@ -708,7 +708,7 @@ Bach_Ker_FD
 save(Bach_Ker_FD, file="cache/Bach_Ker_FD.rda")
 
 # Cluster Bootstrap
-#GR_Bootstrap_FD <- NULL
+GR_Bootstrap_FD <- NULL
 Bach_Bootstrap_FD <- NULL
 
 set.seed(43289)
@@ -724,7 +724,7 @@ for(i in 1:50){
   # Create new data and kernel matrix
   data <- NULL
   K_Original_B <- NULL
-  #K_GR_B <- NULL
+  K_GR_B <- NULL
   K_Bach_B <- NULL
   
   for(i in 1:m){
@@ -740,8 +740,8 @@ for(i in 1:50){
     K_Original_B <- cbind(K_Original_B, sub)
 
     # GR
-    #sub <- K_GR[, training$groupid==s]
-    #K_GR_B <- cbind(K_GR_B, sub)
+    sub <- K_GR[, training$groupid==s]
+    K_GR_B <- cbind(K_GR_B, sub)
 
     # Bachelor's
     sub <- K_Bach[, training$groupid==s]
@@ -754,15 +754,15 @@ for(i in 1:50){
   Y2_B <- data$bachelordegrees_fte
   
   # Get new coefficients
-  #GR_B_c <- bigKRLS(X = X_B, y = Y1_B, derivative = F, vcov.est = F, lambda=GR_Ker$lambda)$coeffs
+  GR_B_c <- bigKRLS(X = X_B, y = Y1_B, derivative = F, vcov.est = F, lambda=GR_Ker$lambda)$coeffs
   Bach_B_c <- bigKRLS(X = X_B, y = Y2_B, derivative = F, vcov.est = F, lambda=Bach_Ker$lambda)$coeffs
   
   # Get FD
-  #GR_B_FD <- mean((K_GR_B %*% GR_B_c) - (K_Original_B %*% GR_B_c))*sd(Y1_B)
+  GR_B_FD <- mean((K_GR_B %*% GR_B_c) - (K_Original_B %*% GR_B_c))*sd(Y1_B)
   Bach_B_FD <- mean((K_Bach_B %*% Bach_B_c) - (K_Original_B %*% Bach_B_c))*sd(Y2_B)
   
   # Add to vectors
-  #GR_Bootstrap_FD <- c(GR_Bootstrap_FD, GR_B_FD)
+  GR_Bootstrap_FD <- c(GR_Bootstrap_FD, GR_B_FD)
   Bach_Bootstrap_FD <- c(Bach_Bootstrap_FD, Bach_B_FD)
   
   # Clear environment
@@ -784,5 +784,5 @@ for(i in 1:50){
   rm(Bach_B_FD)
 }
 
-#save(GR_Bootstrap_FD, file="cache/GR_Bootstrap_FD.rda")
+save(GR_Bootstrap_FD, file="cache/GR_Bootstrap_FD.rda")
 save(Bach_Bootstrap_FD, file="cache/Bach_Bootstrap_FD.rda")
