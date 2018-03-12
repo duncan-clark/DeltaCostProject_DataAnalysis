@@ -50,6 +50,24 @@ analysis_data <- sample[, vars_to_keep]
 
 rm(vars_to_keep)
 
+### Get rid of the salary and wages variables
+names(analysis_data)
+
+to_drop <- c(
+  "instruction02_cpi_fte",
+  "pubserv02_cpi_fte",
+  "acadsupp02_cpi_fte",
+  "studserv02_cpi_fte",
+  "instsupp02_cpi_fte",
+  "auxiliary02_cpi_fte"
+)
+
+analysis_data <- analysis_data[, -match(to_drop, names(analysis_data))]
+
+names(analysis_data)
+
+rm(to_drop)
+
 ### Split into training and testing
 set.seed(201)
 
@@ -75,20 +93,25 @@ testing <- analysis_data[which((analysis_data$groupid %in% split$groupid[split$t
 rm(blocks)
 rm(split)
 
+### Save datafiles
+save(analysis_data, file="cache/analysis_data.Rda")
+save(training, file="cache/training.Rda")
+save(testing, file="cache/testing.Rda")
+
 ### Prepare scaled training X and Y
 # Regular X and Y
 names(training)
 
-X <- as.matrix(training[, 4:46])
+X <- as.matrix(training[, 4:40])
 Y1 <- as.matrix(training$grad_rate_150_p4yr)
 Y2 <- as.matrix(training$bachelordegrees_fte)
 
 # X with interaction terms
 names(training)
-X_Int <- training[, 4:46]
+X_Int <- training[, 4:40]
 names(X_Int)
 
-expense_var <- names(X_Int)[9:23]
+expense_var <- names(X_Int)[9:17]
 
 for(e in expense_var[1:(length(expense_var)-1)]){
   for(var in expense_var[(which(expense_var==e)+1):length(expense_var)]){
@@ -210,7 +233,7 @@ rm(lambda_bach)
 
 # With interactions
 set.seed(34238)
-lambdas <- seq(10^-8, 10^-4, length.out = 10000)
+lambdas <- seq(10^-7, 10^-3, length.out = 10000)
 cv_lasso_bach <- cv.glmnet(x = X_Int,
                            y = Y2,
                            family = "gaussian",
@@ -218,7 +241,7 @@ cv_lasso_bach <- cv.glmnet(x = X_Int,
                            standardize=T,
                            intercept=T,
                            lambda = lambdas)
-which(round(lambdas, 8)==round(cv_lasso_bach$lambda.min, 8)) # try a smaller range
+which(round(lambdas, 7)==round(cv_lasso_bach$lambda.min, 7)) # try a smaller range
 
 plot(cv_lasso_bach$lambda, cv_lasso_bach$cvm, type="l")
 lambda_bach <- cv_lasso_bach$lambda.min
@@ -311,7 +334,7 @@ rm(lambda_bach)
 
 # With interactions
 set.seed(34238)
-lambdas <- seq(10^-7, 10^-3, length.out = 10000)
+lambdas <- seq(10^-5, 10^-1, length.out = 10000)
 cv_ridge_bach <- cv.glmnet(x = X_Int,
                            y = Y2,
                            family = "gaussian",
@@ -319,7 +342,7 @@ cv_ridge_bach <- cv.glmnet(x = X_Int,
                            standardize=T,
                            intercept=T,
                            lambda = lambdas)
-which(round(lambdas, 7)==round(cv_ridge_bach$lambda.min, 7)) # try a smaller range
+which(round(lambdas, 5)==round(cv_ridge_bach$lambda.min, 5)) # try a smaller range
 
 plot(cv_ridge_bach$lambda, cv_ridge_bach$cvm, type="l")
 lambda_bach <- cv_ridge_bach$lambda.min
@@ -360,11 +383,13 @@ load("cache/Bach_Ker.rda")
 
 ##### SEE HOW EACH MODEL DOES ON THE TESTING SET
 ### Prepare Testing Set
-Y1_Test <- testing[, 47] 
-Y2_Test <- testing[, 48]
+names(testing)
+Y1_Test <- testing$grad_rate_150_p4yr
+Y2_Test <- testing$bachelordegrees_fte
 
 # Standardize X from testing Set
-X_Test_Int <- testing[, 4:46]
+names(testing)
+X_Test_Int <- testing[, 4:40]
 for(e in expense_var[1:(length(expense_var)-1)]){
   for(var in expense_var[(which(expense_var==e)+1):length(expense_var)]){
     X_Test_Int <- cbind(X_Test_Int, X_Test_Int[, e]*X_Test_Int[, var])
@@ -376,7 +401,11 @@ for(e in expense_var[1:(length(expense_var)-1)]){
 }
 X_Test_Int <- as.matrix(X_Test_Int)
 
-X_Test <- X_Test_Int[, 1:43]
+sum(1-(colnames(X_Test_Int)==colnames(X_Int))) # 0
+
+colnames(X_Test_Int)
+X_Test <- X_Test_Int[, 1:37]
+sum(1-(colnames(X_Test)==colnames(X))) # 0
 
 # Prepare Kernel for the testing X
 X_Training_Means <- t(as.matrix(apply(X, 2, mean)))
@@ -386,6 +415,15 @@ sum(1-(colnames(X_Test)==colnames(X_Training_Means))) # 0
 sum(1-(colnames(X_Test)==colnames(X_Training_SDs))) # 0
 
 Ones <- as.matrix(rep(1, nrow(X_Test)))
+
+dim(X_Training_Means)
+dim(X_Training_SDs)
+dim(Ones)
+dim(Ones %*% X_Training_Means)
+dim(Ones %*% X_Training_SDs)
+dim(X_Test)
+View(Ones %*% X_Training_Means)
+View(Ones %*% X_Training_SDs)
 
 X_Test_Standard <- X_Test
 X_Test_Standard <- X_Test_Standard - (Ones %*% X_Training_Means)
@@ -506,7 +544,6 @@ rm(GR_Derivatives)
 ##### EXAMINE RESULTS
 ### Get Derivative Matrices
 # Grad Rate
-#GR_Derivatives <- cbind(t(as.matrix(GR_Ker$avgderivatives)) * sd(Y1), sqrt(t(as.matrix(GR_Ker$var.avgderivatives))) * sd(Y1))
 GR_Derivatives <- cbind(t(as.matrix(GR_Ker$avgderivatives)), sqrt(t(as.matrix(GR_Ker$var.avgderivatives))))
 GR_Derivatives <- data.frame(GR_Derivatives)
 names(GR_Derivatives) <- c("avg", "se")
@@ -514,13 +551,12 @@ GR_Derivatives$p <- 2*(1-pnorm(abs(GR_Derivatives$avg / GR_Derivatives$se)))
 GR_Derivatives <- round(GR_Derivatives, 7)
 GR_Derivatives <- GR_Derivatives[expense_var, ]
 GR_Derivatives <- GR_Derivatives[GR_Derivatives$p < .05, ]
-View(GR_Derivatives) # most positive are student services and auxiliary (auxiliary02_cpi_fte most)
-                     # most negative is instsupp02_cpi_fte
+View(GR_Derivatives) # most positive are student services and auxiliary (auxiliary01_cpi_fte most)
+                     # most negative is instsupp01_cpi_fte
 
 save(GR_Derivatives, file="cache/GR_Derivatives.rda")
 
 # Bachelor's per FTE
-#Bach_Derivatives <- cbind(t(as.matrix(Bach_Ker$avgderivatives)) * sd(Y2), sqrt(t(as.matrix(Bach_Ker$var.avgderivatives))) * sd(Y2))
 Bach_Derivatives <- cbind(t(as.matrix(Bach_Ker$avgderivatives)), sqrt(t(as.matrix(Bach_Ker$var.avgderivatives))))
 Bach_Derivatives <- data.frame(Bach_Derivatives)
 names(Bach_Derivatives) <- c("avg", "se")
@@ -528,8 +564,8 @@ Bach_Derivatives$p <- 2*(1-pnorm(abs(Bach_Derivatives$avg / Bach_Derivatives$se)
 Bach_Derivatives <- round(Bach_Derivatives, 7)
 Bach_Derivatives <- Bach_Derivatives[expense_var,]
 Bach_Derivatives <- Bach_Derivatives[Bach_Derivatives$p < .05, ]
-View(Bach_Derivatives) # Most positive are student services and auxiliary (studserv02_cpi_fte most)
-                       # Most negative is pubserv02_cpi_fte
+View(Bach_Derivatives) # Most positive are student services and auxiliary (studserv01_cpi_fte most)
+                       # Most negative is opermain01_cpi_fte
 
 save(Bach_Derivatives, file="cache/Bach_Derivatives.rda")
 
@@ -538,11 +574,16 @@ save(Bach_Derivatives, file="cache/Bach_Derivatives.rda")
 ### Create X Training Means, Sds, and Ones vector
 X_Training_Means <- t(as.matrix(apply(X, 2, mean)))
 X_Training_SDs <- t(as.matrix(apply(X, 2, sd)))
+
 Ones <- as.matrix(rep(1, nrow(analysis_data)))
 
 ### Original Kernel Matrix
 names(analysis_data)
-Original <- as.matrix(analysis_data[4:46])
+Original <- as.matrix(analysis_data[4:40])
+
+dim(Original)
+dim(Ones %*% X_Training_Means)
+dim(Ones %*% X_Training_SDs)
 
 Original <- Original - (Ones %*% X_Training_Means)
 Original <- Original / (Ones %*% X_Training_SDs)
@@ -576,9 +617,12 @@ save(K_Original, file="cache/K_Original.rda")
 ### Graduation Rate Kernel Matrix
 # Created altered matrix
 names(analysis_data)
-GR_Altered <- analysis_data[4:46]
-GR_Altered$auxiliary02_cpi_fte <- GR_Altered$auxiliary02_cpi_fte + 1
-GR_Altered$instsupp02_cpi_fte <- GR_Altered$instsupp02_cpi_fte - 1
+GR_Altered <- analysis_data[4:40]
+
+summary(GR_Altered$instsupp01_cpi_fte) # Try taking 100 out of this and putting it into auxiliary02_cpi_fte
+
+GR_Altered$auxiliary01_cpi_fte <- GR_Altered$auxiliary01_cpi_fte + 100
+GR_Altered$instsupp01_cpi_fte <- GR_Altered$instsupp01_cpi_fte - 100
 GR_Altered <- as.matrix(GR_Altered)
 
 GR_Altered <- GR_Altered - (Ones %*% X_Training_Means)
@@ -613,9 +657,12 @@ save(K_GR, file="cache/K_GR.rda")
 ### Bachelor's Kernel Matrix
 # Create altered matrix
 names(analysis_data)
-Bach_Altered <- analysis_data[4:46]
-Bach_Altered$studserv02_cpi_fte <- Bach_Altered$studserv02_cpi_fte + 1
-Bach_Altered$pubserv02_cpi_fte <- Bach_Altered$pubserv02_cpi_fte - 1
+Bach_Altered <- analysis_data[4:40]
+
+summary(Bach_Altered$opermain01_cpi_fte) # Try taking 100 out of this and putting it into studserv02_cpi_fte
+
+Bach_Altered$studserv01_cpi_fte <- Bach_Altered$studserv01_cpi_fte + 100
+Bach_Altered$opermain01_cpi_fte <- Bach_Altered$opermain01_cpi_fte - 100
 Bach_Altered <- as.matrix(Bach_Altered)
 
 Bach_Altered <- Bach_Altered - (Ones %*% X_Training_Means)
@@ -649,21 +696,19 @@ save(K_Bach, file="cache/K_Bach.rda")
 
 ### Graduation Rate First Difference
 # Grad Rate Estimate
-#GR_Ker_FD <- sd(Y1)*mean((GR_Altered %*% GR_Ker$coeffs) - (Original %*% GR_Ker$coeffs))
 GR_Ker_FD <- mean((K_GR %*% GR_Ker$coeffs) - (K_Original %*% GR_Ker$coeffs))*sd(Y1)
 GR_Ker_FD
 
 save(GR_Ker_FD, file="cache/GR_Ker_FD.rda")
 
 # Bachelor Estimate
-#Bach_Ker_FD <- sd(Y2)*mean((Bach_Altered %*% Bach_Ker$coeffs) - (Original %*% Bach_Ker$coeffs))
 Bach_Ker_FD <- mean((K_Bach %*% Bach_Ker$coeffs) - (K_Original %*% Bach_Ker$coeffs))*sd(Y2)
 Bach_Ker_FD
 
 save(Bach_Ker_FD, file="cache/Bach_Ker_FD.rda")
 
 # Cluster Bootstrap
-GR_Bootstrap_FD <- NULL
+#GR_Bootstrap_FD <- NULL
 Bach_Bootstrap_FD <- NULL
 
 set.seed(43289)
@@ -679,7 +724,7 @@ for(i in 1:50){
   # Create new data and kernel matrix
   data <- NULL
   K_Original_B <- NULL
-  K_GR_B <- NULL
+  #K_GR_B <- NULL
   K_Bach_B <- NULL
   
   for(i in 1:m){
@@ -695,8 +740,8 @@ for(i in 1:50){
     K_Original_B <- cbind(K_Original_B, sub)
 
     # GR
-    sub <- K_GR[, training$groupid==s]
-    K_GR_B <- cbind(K_GR_B, sub)
+    #sub <- K_GR[, training$groupid==s]
+    #K_GR_B <- cbind(K_GR_B, sub)
 
     # Bachelor's
     sub <- K_Bach[, training$groupid==s]
@@ -704,20 +749,20 @@ for(i in 1:50){
   }
   
   # Get new x and y
-  X_B <- as.matrix(data[, 4:46])
+  X_B <- as.matrix(data[, 4:40])
   Y1_B <- data$grad_rate_150_p4yr
   Y2_B <- data$bachelordegrees_fte
   
   # Get new coefficients
-  GR_B_c <- bigKRLS(X = X_B, y = Y1_B, derivative = F, vcov.est = F, lambda=GR_Ker$lambda)$coeffs
+  #GR_B_c <- bigKRLS(X = X_B, y = Y1_B, derivative = F, vcov.est = F, lambda=GR_Ker$lambda)$coeffs
   Bach_B_c <- bigKRLS(X = X_B, y = Y2_B, derivative = F, vcov.est = F, lambda=Bach_Ker$lambda)$coeffs
   
   # Get FD
-  GR_B_FD <- mean((K_GR_B %*% GR_B_c) - (K_Original_B %*% GR_B_c))*sd(Y1_B)
-  Bach_B_FD <- mean((K_GR_B %*% Bach_B_c) - (K_Original_B %*% Bach_B_c))*sd(Y2_B)
+  #GR_B_FD <- mean((K_GR_B %*% GR_B_c) - (K_Original_B %*% GR_B_c))*sd(Y1_B)
+  Bach_B_FD <- mean((K_Bach_B %*% Bach_B_c) - (K_Original_B %*% Bach_B_c))*sd(Y2_B)
   
   # Add to vectors
-  GR_Bootstrap_FD <- c(GR_Bootstrap_FD, GR_B_FD)
+  #GR_Bootstrap_FD <- c(GR_Bootstrap_FD, GR_B_FD)
   Bach_Bootstrap_FD <- c(Bach_Bootstrap_FD, Bach_B_FD)
   
   # Clear environment
@@ -739,5 +784,5 @@ for(i in 1:50){
   rm(Bach_B_FD)
 }
 
-save(GR_Bootstrap_FD, file="cache/GR_Bootstrap_FD.rda")
+#save(GR_Bootstrap_FD, file="cache/GR_Bootstrap_FD.rda")
 save(Bach_Bootstrap_FD, file="cache/Bach_Bootstrap_FD.rda")
