@@ -1,0 +1,29 @@
+---
+title: "Examining the Relationship of Expenditures and Student Outcomes at Public 4-Year Institutions"
+author: "Duncan Clark and Leonard Wainstein"
+date: "March 17, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Introduction
+
+Higher education institutions serve a public good; they educate their students with the hope that in the future these graduates will go on and contribute to society as a whole. However these students also benefit in themselves as they tend to be more successful than their non university educated peers. Thus since much of higher education is funded by the public purse, it becomes a matter for the public to decide how much to subsidise individuals educations for the good of the whole, and in particular it becomes crucial that, the public money is efficiently used. It is the efficiency of the expenditure that we concerned ourselves with in this project.
+
+In this project we hoped to analyse quantitatively the relationship between student outcomes at public 4 year higher education institutions and their expenditures. Specifically we looked at graduation rates for 4 year degrees within 6 years and the number of bachelor's degrees awarded in per full time equivalent student. We analysed data obtained from the Delta Cost Project at American Institutes for Research, which gave a dataset for all higher education institutions in the US for 2003 to 2015. The data is publically available here: https://www.deltacostproject.org/
+
+#Data Processing
+
+Firstly we restricted ourselves to institutions primarily granting bachelors degrees, and excluded any institutions not included for alls year from 2003 to 2015. Years from 2003 onwards, generally had a low level of missingness in the outcomes of interest, as well as covaraiates regarding expenditures, so we chose this as our cutoff for inclusion. As for examining other types of institutions, this could be interesting though there is liklely to be heterogeneity since the institutions serve different purposes, so for our purposes we simply excluded them.
+
+Dollar values where scaled to 2015 dollars using CPI, to allow for fair comparison, and monetary totals were scaled by total full time equivalent enrollment to account for the size of the institutions. There are altenate inflation indices, that may have been appropriate, for example HEPI - higher education price inflation, which is specific to the higher education sector, however these were not considered.
+
+We also added GDP and unemployment data for each state in line with the approach in [1]####Need to reference properly here####. 
+
+
+
+
+
+
