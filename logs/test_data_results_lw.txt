@@ -1,0 +1,32 @@
+[1] "---GR---"
+[1] "LM"
+[1] "RMSE:  0.1008 ( 0.6385  standardized)"
+[1] "RMSE (w/ Int.):  0.0983 ( 0.623  standardized)"
+[1] 
+[1] "Lasso"
+[1] "RMSE:  0.1004 ( 0.6359  standardized)"
+[1] "RMSE (w/ Int.):  0.0979 ( 0.6205  standardized)"
+[1] 
+[1] "Ridge"
+[1] "RMSE:  0.1005 ( 0.6366  standardized)"
+[1] "RMSE (w/ Int.):  0.099 ( 0.6276  standardized)"
+[1] 
+[1] "Ker"
+[1] "RMSE:  0.0959 ( 0.6076  standardized)"
+[1] 
+[1] "---Bach---"
+[1] "LM"
+[1] "RMSE:  0.0348 ( 0.9194  standardized)"
+[1] "RMSE (w/ Int.):  0.0359 ( 0.9461  standardized)"
+[1] 
+[1] "Lasso"
+[1] "RMSE:  0.0346 ( 0.9129  standardized)"
+[1] "RMSE (w/ Int.):  0.0337 ( 0.8895  standardized)"
+[1] 
+[1] "Ridge"
+[1] "RMSE:  0.0344 ( 0.9074  standardized)"
+[1] "RMSE (w/ Int.):  0.0331 ( 0.8734  standardized)"
+[1] 
+[1] "Ker"
+[1] "RMSE:  0.0274 ( 0.7235  standardized)"
+[1] 
