@@ -251,7 +251,25 @@ Bach_test$mse_raw <- Bach_test$mse*sd
 Bach_test$mse_raw <- round(Bach_test$mse_raw,4)
 Bach_test$mse <- round(Bach_test$mse,4)
 
+Bach_test$mse <- format(Bach_test$mse, scientific = FALSE)
 
+
+#Make Tables for report#
+
+Bach_test_report <- data.frame(rep(0,6))
+Bach_test_report$Model <- Bach_test$method
+Bach_test_report$Standardized_RMSE <- Bach_test$mse
+Bach_test_report[[1]] <- NULL
+Bach_test_report <-  Bach_test_report[2:6,]
+
+GR_test_report <- data.frame(rep(0,6))
+GR_test_report$Model <- grad_rate_test$method
+GR_test_report$Standardized_RMSE <- as.character(grad_rate_test$mse)
+GR_test_report[[1]] <- NULL
+GR_test_report <-  GR_test_report[2:6,]
+
+cache(variable = "GR_test_report")
+cache(variable = "Bach_test_report")
 
 
 

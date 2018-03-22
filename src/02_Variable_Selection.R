@@ -4,7 +4,7 @@
 
 # Code split into Sections ctrl f #1) #2) etc. for each section
 
-#setwd("C:/Users/Duncan/Documents/Academics/UCLA_Academics/Classes/Stats_201B/DeltaCostProject_DataAnalysis")
+setwd("C:/Users/Duncan/Documents/Academics/UCLA_Academics/Classes/Stats_201B/DeltaCostProject_DataAnalysis")
 library(ProjectTemplate)
 load.project()
 
@@ -632,28 +632,56 @@ Bach_beta_ridge4 <- as.matrix(Bach_fit_ridge4$beta[,match(opt_lambda,lambdas)])
 
 
 GR_big <- cbind(GR_lasso_covariate_selection,GR_beta_lasso4_biggest[match(GR_lasso_covariate_selection,GR_comparison_3$GR_beta_lasso4_biggest_names)])
-
 GR_small <- cbind(GR_lasso_covariate_selection,GR_beta_lasso4_smallest[match(GR_lasso_covariate_selection,GR_comparison_3$GR_beta_lasso4_smallest_names)])
 
-Bach_big <- cbind(Bach_lasso_covariate_selection,Bach_beta_lasso4_biggest[match(Bach_lasso_covariate_selection,Bach_comparison_3$Bach_beta_lasso4_biggest_names)])
+tmp <- GR_big[,2]
+tmp[is.na(tmp)] <- 0
+tmp1 <- GR_small[,2]
+tmp1[is.na(tmp1)] <- 0
 
+GR_coef <- cbind(GR_big[,1],as.numeric(tmp)+as.numeric(tmp1))
+GR_coef[,2] <- signif(as.numeric(GR_coef[,2]),4)
+
+##Give brief description of each variables:
+tmp <- c("Number of full-time undergrads not full-time, first-year",
+         "Percentage of first, full-time undergrads with federal grants",
+         "Total number of part-time students",
+         "Share of total part-time that are undergraduates",
+         "Total Pell Grants",
+         "Revenue from auxiliary enterprises",
+         "Total number of part-time postbaccalaureate students",
+         "Total education and general expenditures - salaries and wages",
+         "Share of total degrees at bachelor's level",
+         "Fall cohort as percentage of total undergraduates"
+)
+
+GR_coef <- cbind(GR_coef,tmp)
+GR_coef <- as.data.frame(GR_coef)
+names(GR_coef) <- c("Variable","Coeffiecient","Description")
+
+Bach_big <- cbind(Bach_lasso_covariate_selection,Bach_beta_lasso4_biggest[match(Bach_lasso_covariate_selection,Bach_comparison_3$Bach_beta_lasso4_biggest_names)])
 Bach_small <-  cbind(Bach_lasso_covariate_selection,Bach_beta_lasso4_smallest[match(Bach_lasso_covariate_selection,Bach_comparison_3$Bach_beta_lasso4_smallest_names)])
 
+tmp <- Bach_big[,2]
+tmp[is.na(tmp)] <- 0
+tmp1 <- Bach_small[,2]
+tmp1[is.na(tmp1)] <- 0
 
+Bach_coef <- cbind(Bach_big[,1],as.numeric(tmp)+as.numeric(tmp1))
+Bach_coef[,2] <- signif(as.numeric(Bach_coef[,2]),4)
 
+tmp <- c("Share of total degrees at bachelor's level",
+         "Indicator for historically black college or university status",
+         "Share of total undergraduates completed first year",
+         "Education and related expenses per degree",
+         "Number of first, full-time undergrads with federal grants",
+         "Instruction, student services, and other educational costs",
+         "Total enrollment of black students",
+         "Number of first, full-time  undergrads with institutional grants",
+         "Share of total part-time that are undergraduates",
+         "Instruction hours based on credit for undergraduates"
+)
 
-
-
-
-
-
-
-
-
-
-#####CACHE Data and Models#####
-
-
-
-
-
+Bach_coef <- cbind(Bach_coef,tmp)
+Bach_coef <- as.data.frame(Bach_coef)
+names(Bach_coef) <- c("Variable","Coeffiecient","Description")
