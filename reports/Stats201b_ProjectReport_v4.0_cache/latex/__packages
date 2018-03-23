@@ -1,0 +1,14 @@
+base
+rmarkdown
+ProjectTemplate
+knitr
+reshape
+plyr
+dplyr
+ggplot2
+readstata13
+Matrix
+foreach
+glmnet
+stringr
+margins
