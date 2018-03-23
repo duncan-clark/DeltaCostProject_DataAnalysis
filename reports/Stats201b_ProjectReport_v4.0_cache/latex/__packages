@@ -12,3 +12,5 @@ foreach
 glmnet
 stringr
 margins
+fit
+lubridate
