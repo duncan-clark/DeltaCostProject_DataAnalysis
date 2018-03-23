@@ -81,3 +81,18 @@ legend("topright", legend=c(paste("Estimate ", "(", format(round(Bach_Ker_FD, 5)
 abline(v=Bach_Ker_FD, col="blue", lty=2)
 dev.off()
 
+### Find out how many partial derivatives are greater/less than 0
+# Positve from GR_Ker
+sum(GR_Ker$derivatives[, "studserv01_cpi_fte"]<0) / nrow(GR_Ker$derivatives)
+sum(GR_Ker$derivatives[, "auxiliary01_cpi_fte"]<0) / nrow(GR_Ker$derivatives)
+
+# Negative from GR_Ker
+sum(GR_Ker$derivatives[, "instsupp01_cpi_fte"]>0) / nrow(GR_Ker$derivatives)
+
+# Positve from Bach_Ker
+sum(Bach_Ker$derivatives[, "studserv01_cpi_fte"]<0) / nrow(Bach_Ker$derivatives)
+sum(Bach_Ker$derivatives[, "auxiliary01_cpi_fte"]<0) / nrow(Bach_Ker$derivatives)
+
+# Negative from Bach_Ker
+sum(Bach_Ker$derivatives[, "pubserv01_cpi_fte"]>0) / nrow(Bach_Ker$derivatives)
+sum(Bach_Ker$derivatives[, "opermain01_cpi_fte"]>0) / nrow(Bach_Ker$derivatives)
